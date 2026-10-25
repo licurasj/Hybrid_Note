@@ -1,30 +1,65 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:lucas_tac368_project/app_cubit.dart';
+import 'package:lucas_tac368_project/app_data.dart';
+import 'package:lucas_tac368_project/app_storage.dart';
+import 'package:lucas_tac368_project/drive_sync_service.dart';
 import 'package:lucas_tac368_project/main.dart';
 
+// In-memory storage so the test never touches path_provider or the disk.
+class FakeAppStorage extends AppStorage {
+  AppData data = AppData.empty('test-device');
+  String? localeCode = 'en';
+
+  @override
+  Future<String> getOrCreateDeviceId() async => 'test-device';
+
+  @override
+  Future<AppData> loadAppData() async => data;
+
+  @override
+  Future<void> saveAppData(AppData data) async {
+    this.data = data;
+  }
+
+  @override
+  Future<String?> loadPreferredLocaleCode() async => localeCode;
+
+  @override
+  Future<void> savePreferredLocaleCode(String? localeCode) async {
+    this.localeCode = localeCode;
+  }
+}
+
+// Signed-out Drive service so no Google sign-in plugin calls are made.
+class FakeDriveSyncService extends DriveSyncService {
+  @override
+  bool get isSignedIn => false;
+
+  @override
+  Future<bool> tryRestorePreviousSignIn() async => false;
+}
+
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('HybridNoteApp starts on the home screen', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      BlocProvider(
+        create: (_) => AppCubit(
+          storage: FakeAppStorage(),
+          driveSyncService: FakeDriveSyncService(),
+          deviceId: 'test-device',
+        )..loadData(),
+        child: const HybridNoteApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.byType(MaterialApp), findsOneWidget);
+    expect(find.text('Home'), findsWidgets);
+    expect(tester.takeException(), isNull);
   });
 }
