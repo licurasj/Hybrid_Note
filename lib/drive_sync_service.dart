@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
@@ -59,7 +60,7 @@ class DriveSyncService {
         );
       }
 
-      return _mergeThenUpload(
+      return mergeThenUpload(
         driveApi: driveApi,
         localData: localData,
       );
@@ -92,7 +93,7 @@ class DriveSyncService {
         );
       }
 
-      return _mergeThenUpload(
+      return mergeThenUpload(
         driveApi: driveApi,
         localData: localData,
       );
@@ -124,7 +125,7 @@ class DriveSyncService {
         );
       }
 
-      return _mergeThenUpload(
+      return mergeThenUpload(
         driveApi: driveApi,
         localData: localData,
       );
@@ -135,7 +136,8 @@ class DriveSyncService {
     }
   }
 
-  Future<SyncResult> _mergeThenUpload({
+  @visibleForTesting
+  Future<SyncResult> mergeThenUpload({
     required drive.DriveApi driveApi,
     required AppData localData,
   }) async {
@@ -167,6 +169,13 @@ class DriveSyncService {
     );
 
     if (remoteData == null) {
+      // The remote file exists but cannot be read. Keep a copy of it before
+      // replacing it; if the copy fails, this throws and nothing is uploaded.
+      await _backUpUnreadableRemoteFile(
+        driveApi: driveApi,
+        fileId: remoteFileId,
+      );
+
       final AppData uploadData = localData
           .copyWith(
             schemaVersion: 2,
@@ -269,11 +278,34 @@ class DriveSyncService {
       bytes.addAll(chunk);
     }
 
-    final String rawJson = utf8.decode(bytes);
-    final Map<String, dynamic> decoded =
-        jsonDecode(rawJson) as Map<String, dynamic>;
+    // Download errors propagate; only content that cannot be parsed counts
+    // as an unreadable file.
+    try {
+      final String rawJson = utf8.decode(bytes);
+      final Map<String, dynamic> decoded =
+          jsonDecode(rawJson) as Map<String, dynamic>;
 
-    return AppData.fromJson(decoded);
+      return AppData.fromJson(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _backUpUnreadableRemoteFile({
+    required drive.DriveApi driveApi,
+    required String fileId,
+  }) async {
+    final String timestamp = DateTime.now()
+        .toUtc()
+        .toIso8601String()
+        .replaceAll(':', '-');
+
+    await driveApi.files.copy(
+      drive.File()
+        ..name = '$_fileName.unreadable-$timestamp'
+        ..parents = ['appDataFolder'],
+      fileId,
+    );
   }
 
   Future<void> _createRemoteFile({
