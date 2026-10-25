@@ -317,6 +317,43 @@ for AI. Two routes, depending on the sync choice in Section 8:
    provider), add an in-app AI opt-in, and complete the data-safety forms (Play) and privacy labels
    (App Store).
 
+### 7.1a Accounts and who pays
+
+- Users sign in with their existing Google account (the same button as today). Firebase Auth
+  creates a user record in your project automatically on first sign-in. **There is no separate
+  sign-up, password or account to create.**
+- You (the project owner) pay everything on the Blaze plan. Users pay nothing.
+- Because this is mainly a personal/experimental tool, the AI function checks an **allowlist** (a
+  Firestore `config/aiAllowlist` doc, or a custom claim) and starts with just your email. Sync can
+  stay open to any signed-in user, since at this scale it costs nothing.
+- Keep the Google OAuth consent screen in **Testing** mode with yourself as the only test user, so
+  no Google verification is needed. Drop the Drive scope after the one-time import.
+
+### 7.1b Cost estimate (personal use)
+
+Prices are from secondary sources (Oct 2026); confirm them on the official pricing pages.
+
+| Item | Free allowance | Your likely usage | Est. monthly cost |
+|---|---|---|---|
+| Firestore | 50k reads, 20k writes, 20k deletes per day; 1 GiB stored | hundreds/day, a few MB | **$0** |
+| Cloud Functions | ~2M invocations/month | ~1k/month | **$0** |
+| Artifact Registry (function container images) | 0.5 GB | can exceed slightly | **$0–0.10** |
+| Secret Manager | small free tier | 1–2 secrets | **$0–0.10** |
+| AI: small model (e.g. GPT-6 Luna at ~$0.10 in / $0.50 out per 1M tokens) | — | ~4k in + 800 out tokens ≈ $0.0008/request; 30/day | **≈ $0.75** |
+| AI: larger model, used only for create/restructure | — | assumed ~$2 in / $10 out per 1M ≈ $0.016/request; 2–5/day | **≈ $1–2.50** |
+| Decisions API (optional) | — | tiny inputs | **cents** |
+
+**Expected total: about $1–5/month**, dominated by AI calls. One-time or optional costs: Google
+Play developer fee ($25 once) only if publishing to the store, since sideloading an APK is free;
+Apple developer ($99/yr) only for iOS beyond short-lived personal sideloads; Windows builds are
+free.
+
+**Spending protection.** Google Cloud budgets only *alert*; they don't stop spending. The real caps
+are:
+- the per-user daily rate limit inside the AI function;
+- the allowlist;
+- a monthly spend limit set on the AI provider's own project (check what your provider offers).
+
 ### 7.2 Route W — Cloudflare Worker (if sync stays on Drive)
 
 A single Worker that verifies the Google ID token the app already gets (Google's public JWKS),
@@ -360,7 +397,10 @@ match /users/{uid}/{document=**} {
 }
 ```
 
-**Recommendation: B (Firestore)**, *if* you accept two trade-offs: (1) data moves from the user's
+**Decision (rev 3): B — Firestore.** Accepted trade-offs below. The Drive file becomes a read-only,
+one-time import source.
+
+Original reasoning — B, *if* you accept two trade-offs: (1) data moves from the user's
 own Drive to your project, which you're responsible for; (2) Linux desktop (and possibly Windows)
 loses sync or the app on those platforms. Reasons: the AI work already forces a Firebase-style
 backend, so sync shares its auth and project at no extra infrastructure. It removes the merge,
