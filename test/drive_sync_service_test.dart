@@ -5,9 +5,9 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-import 'package:lucas_tac368_project/app_data.dart';
-import 'package:lucas_tac368_project/drive_sync_service.dart';
-import 'package:lucas_tac368_project/sync_result.dart';
+import 'package:hybrid_note/app_data.dart';
+import 'package:hybrid_note/drive_sync_service.dart';
+import 'package:hybrid_note/sync_result.dart';
 
 // Fakes the Drive endpoints used by sync: list, download, copy and upload.
 class FakeDrive {

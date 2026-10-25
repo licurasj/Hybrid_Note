@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:lucas_tac368_project/app_data.dart';
-import 'package:lucas_tac368_project/app_storage.dart';
+import 'package:hybrid_note/app_data.dart';
+import 'package:hybrid_note/app_storage.dart';
 
 void main() {
   late Directory directory;

@@ -1,4 +1,4 @@
-# lucas_tac368_project
+# Hybrid Note
 
 A new Flutter project.
 

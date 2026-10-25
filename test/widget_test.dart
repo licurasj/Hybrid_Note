@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:lucas_tac368_project/app_cubit.dart';
-import 'package:lucas_tac368_project/app_data.dart';
-import 'package:lucas_tac368_project/app_storage.dart';
-import 'package:lucas_tac368_project/drive_sync_service.dart';
-import 'package:lucas_tac368_project/main.dart';
+import 'package:hybrid_note/app_cubit.dart';
+import 'package:hybrid_note/app_data.dart';
+import 'package:hybrid_note/app_storage.dart';
+import 'package:hybrid_note/drive_sync_service.dart';
+import 'package:hybrid_note/main.dart';
 
 // In-memory storage so the test never touches path_provider or the disk.
 class FakeAppStorage extends AppStorage {
