@@ -18,6 +18,8 @@
   "languageFollowsDevice": "Use device language",
   "switchToDarkMode": "Passer au mode sombre",
   "switchToLightMode": "Passer au mode clair",
+  "switchToLeftHandMode": "Passer en mode gaucher",
+  "switchToRightHandMode": "Passer en mode droitier",
   "pendingTasks": "Pending Tasks",
   "completedTasks": "Completed Tasks",
   "journalEntries": "Journal Entries",

@@ -10,6 +10,7 @@ class AppStorage {
   static const String _dataFileName = 'hybrid_note_app_data.json';
   static const String _deviceFileName = 'hybrid_note_app_device.txt';
   static const String _localeFileName = 'hybrid_note_app_locale.txt';
+  static const String _handFileName = 'hybrid_note_app_hand.txt';
 
   // Tests pass a temporary directory; the app uses the documents folder.
   final Future<Directory> Function() _getDirectory;
@@ -97,6 +98,20 @@ class AppStorage {
     final File tempFile = File('${file.path}.tmp');
     await tempFile.writeAsString(encoder.convert(data.toJson()), flush: true);
     await tempFile.rename(file.path);
+  }
+
+  // Left-hand mode is a per-device choice, so it is stored here rather than
+  // in the synced AppData.
+  Future<bool> loadLeftHanded() async {
+    final Directory directory = await _getDirectory();
+    final File file = File('${directory.path}/$_handFileName');
+    return await file.exists() && (await file.readAsString()).trim() == 'left';
+  }
+
+  Future<void> saveLeftHanded(bool leftHanded) async {
+    final Directory directory = await _getDirectory();
+    await File('${directory.path}/$_handFileName')
+        .writeAsString(leftHanded ? 'left' : 'right');
   }
 
   Future<String?> loadPreferredLocaleCode() async {

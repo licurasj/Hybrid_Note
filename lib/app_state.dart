@@ -10,6 +10,7 @@ class AppState {
   final String? syncMessage;
   final DateTime? lastSyncedAt;
   final String? selectedLocaleCode;
+  final bool isLeftHanded;
 
   const AppState({
     required this.data,
@@ -21,6 +22,7 @@ class AppState {
     this.syncMessage,
     this.lastSyncedAt,
     this.selectedLocaleCode,
+    this.isLeftHanded = false,
   });
 
   factory AppState.initial(String deviceId) {
@@ -40,6 +42,7 @@ class AppState {
     bool? isGoogleSignedIn,
     bool? isDarkMode,
     String? selectedLocaleCode,
+    bool? isLeftHanded,
     String? errorMessage,
     String? syncMessage,
     DateTime? lastSyncedAt,
@@ -59,6 +62,7 @@ class AppState {
       selectedLocaleCode: clearSelectedLocale
           ? null
           : selectedLocaleCode ?? this.selectedLocaleCode,
+      isLeftHanded: isLeftHanded ?? this.isLeftHanded,
     );
   }
 

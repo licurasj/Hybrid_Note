@@ -35,4 +35,31 @@ void main() {
     expect(find.text('Grocery List'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('left-hand mode moves the hub to the left and is saved', (
+    WidgetTester tester,
+  ) async {
+    final FakeAppStorage storage = FakeAppStorage();
+    await tester.pumpWidget(
+      BlocProvider(
+        create: (_) => AppCubit(
+          storage: storage,
+          driveSyncService: FakeDriveSyncService(),
+          deviceId: 'test-device',
+        )..loadData(),
+        child: const HybridNoteApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final double width = tester.getSize(find.byType(Scaffold).first).width;
+    double hubX() => tester.getCenter(find.byKey(const ValueKey('launcher-hub'))).dx;
+    expect(hubX(), greaterThan(width / 2));
+
+    await tester.tap(find.byTooltip('Switch to left-hand mode'));
+    await tester.pumpAndSettle();
+
+    expect(hubX(), lessThan(width / 2));
+    expect(storage.leftHanded, isTrue);
+  });
 }

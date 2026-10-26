@@ -41,6 +41,11 @@ class AppCubit extends Cubit<AppState> {
     );
   }
 
+  Future<void> setLeftHanded(bool leftHanded) async {
+    emit(state.copyWith(isLeftHanded: leftHanded));
+    await storage.saveLeftHanded(leftHanded);
+  }
+
   void _clearSyncMessageSoon(
     String message, {
     Duration delay = const Duration(milliseconds: 900),
@@ -89,6 +94,7 @@ class AppCubit extends Cubit<AppState> {
     try {
       final AppData loadedData = await storage.loadAppData();
       final String? preferredLocaleCode = await storage.loadPreferredLocaleCode();
+      final bool leftHanded = await storage.loadLeftHanded();
 
       emit(
         state.copyWith(
@@ -98,6 +104,7 @@ class AppCubit extends Cubit<AppState> {
           isGoogleSignedIn: driveSyncService.isSignedIn,
           selectedLocaleCode: preferredLocaleCode,
           clearSelectedLocale: preferredLocaleCode == null,
+          isLeftHanded: leftHanded,
           clearError: true,
         ),
       );

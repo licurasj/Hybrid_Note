@@ -171,6 +171,17 @@ class HomeScreen extends StatelessWidget {
               ),
               IconButton(
                 onPressed: () {
+                  context.read<AppCubit>().setLeftHanded(!state.isLeftHanded);
+                },
+                icon: Icon(
+                  state.isLeftHanded ? Icons.back_hand_outlined : Icons.front_hand_outlined,
+                ),
+                tooltip: state.isLeftHanded
+                    ? loc.switchToRightHandMode
+                    : loc.switchToLeftHandMode,
+              ),
+              IconButton(
+                onPressed: () {
                   context.read<AppCubit>().toggleDarkMode();
                 },
                 icon: Icon(

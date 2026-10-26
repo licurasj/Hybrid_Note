@@ -356,6 +356,7 @@ class _MainShellState extends State<MainShell> {
                     onEdit: (note) => _openList(note.id),
                     editLabel: loc.edit,
                     addLabel: loc.add,
+                    leftHanded: state.isLeftHanded,
                   ),
                 ),
               ],

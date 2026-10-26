@@ -63,6 +63,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get switchToLightMode => 'In den Hellmodus wechseln';
 
   @override
+  String get switchToLeftHandMode => 'Zum Linkshändermodus wechseln';
+
+  @override
+  String get switchToRightHandMode => 'Zum Rechtshändermodus wechseln';
+
+  @override
   String get pendingTasks => 'Pending Tasks';
 
   @override

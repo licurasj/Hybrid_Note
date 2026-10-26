@@ -63,6 +63,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switchToLightMode => 'Switch to light mode';
 
   @override
+  String get switchToLeftHandMode => 'Switch to left-hand mode';
+
+  @override
+  String get switchToRightHandMode => 'Switch to right-hand mode';
+
+  @override
   String get pendingTasks => 'Pending Tasks';
 
   @override

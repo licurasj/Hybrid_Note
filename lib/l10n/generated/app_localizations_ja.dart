@@ -63,6 +63,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get switchToLightMode => 'ライトモードに切り替え';
 
   @override
+  String get switchToLeftHandMode => '左手モードに切り替え';
+
+  @override
+  String get switchToRightHandMode => '右手モードに切り替え';
+
+  @override
   String get pendingTasks => 'Pending Tasks';
 
   @override

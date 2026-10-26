@@ -63,6 +63,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get switchToLightMode => '切换到浅色模式';
 
   @override
+  String get switchToLeftHandMode => '切换到左手模式';
+
+  @override
+  String get switchToRightHandMode => '切换到右手模式';
+
+  @override
   String get pendingTasks => '待办任务';
 
   @override

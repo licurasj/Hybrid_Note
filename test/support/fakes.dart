@@ -18,6 +18,16 @@ class FakeAppStorage extends AppStorage {
     this.data = data;
   }
 
+  bool leftHanded = false;
+
+  @override
+  Future<bool> loadLeftHanded() async => leftHanded;
+
+  @override
+  Future<void> saveLeftHanded(bool leftHanded) async {
+    this.leftHanded = leftHanded;
+  }
+
   @override
   Future<String?> loadPreferredLocaleCode() async => localeCode;
 

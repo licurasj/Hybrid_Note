@@ -21,16 +21,17 @@ class LauncherNote {
   final String semanticsLabel;
 }
 
-// Radial sticker-note launcher (plan section 5), with a plain look until the
-// design pass (D-3). Fill the screen with it (it sits in a Stack); the hub is
-// drawn at `hubAlignment`.
+// Radial launcher (plan section 5), with a plain look until the design pass
+// (D-3). Fill the screen with it (it sits in a Stack). The hub sits near the
+// bottom-right corner (bottom-left in left-hand mode), lists fan out from it
+// as long tabs, and "+" sits next to the hub. Layout: LauncherGeometry.
 //
-// Hold mode: press the hub, drag onto a note and release to open; rest on a
-// note until the ring fills, then release to edit; release on "+" for a new
-// list; release on the hub or off the arc to cancel. Resting at either end of
-// the notes scrolls them.
-// Tap mode: a quick tap on the hub keeps the arc open with arrow buttons; tap
-// a note to open, long-press to edit; tap outside, the hub or Esc to close.
+// Hold mode: press the hub, drag onto a tab and release to open; rest on a
+// tab until it fills, then release to edit; release on "+" for a new list;
+// release on the hub or off the fan to cancel. Resting at either end of the
+// fan scrolls it.
+// Tap mode: a quick tap on the hub keeps the fan open with arrow buttons; tap
+// a tab to open, long-press to edit; tap outside, the hub or Esc to close.
 // Keys: left/right move focus, Enter opens, E edits, Esc closes.
 class RadialLauncher extends StatefulWidget {
   const RadialLauncher({
@@ -40,7 +41,7 @@ class RadialLauncher extends StatefulWidget {
     required this.onEdit,
     this.onNew,
     this.config = const LauncherConfig(),
-    this.hubAlignment = const Alignment(0, 0.88),
+    this.leftHanded = false,
     this.hubTooltip = 'Lists',
     this.addLabel = 'New list',
     this.editLabel = 'Edit',
@@ -52,7 +53,7 @@ class RadialLauncher extends StatefulWidget {
   // Null shows the "+" dimmed and inactive.
   final VoidCallback? onNew;
   final LauncherConfig config;
-  final Alignment hubAlignment;
+  final bool leftHanded;
   final String hubTooltip;
   final String addLabel;
   final String editLabel;
@@ -261,11 +262,11 @@ class RadialLauncherState extends State<RadialLauncher>
     }
     setState(() {
       _scrollOffset = geometry.clampOffset(
-        _scrollOffset + direction * geometry.noteSlotCount,
+        _scrollOffset + direction * geometry.slotCount,
       );
       _focusIndex = _focusIndex.clamp(
         _scrollOffset.round(),
-        _scrollOffset.round() + geometry.noteSlotCount - 1,
+        _scrollOffset.round() + geometry.slotCount - 1,
       );
     });
   }
@@ -291,9 +292,9 @@ class RadialLauncherState extends State<RadialLauncher>
         _focusIndex = next;
         if (next < _scrollOffset) {
           _scrollOffset = geometry.clampOffset(next.toDouble());
-        } else if (next >= _scrollOffset + geometry.noteSlotCount) {
+        } else if (next >= _scrollOffset + geometry.slotCount) {
           _scrollOffset = geometry.clampOffset(
-            (next - geometry.noteSlotCount + 1).toDouble(),
+            (next - geometry.slotCount + 1).toDouble(),
           );
         }
       });
@@ -308,49 +309,63 @@ class RadialLauncherState extends State<RadialLauncher>
     return KeyEventResult.ignored;
   }
 
-  Widget _noteWidget(LauncherNote note, int index, Offset center) {
-    final double size = widget.config.noteSize;
+  Widget _noteWidget(
+    LauncherGeometry geometry,
+    LauncherNote note,
+    int index,
+    double angle,
+  ) {
+    final LauncherConfig config = widget.config;
     final bool hovered = _hover.kind == LauncherTargetKind.note &&
         _hover.noteIndex == index;
     final bool focused = _mode == _Mode.tap && _focusIndex == index;
     final bool lifted = hovered || focused;
+    final Offset center =
+        geometry.pointAt(angle, config.innerRadius + config.tabLength / 2);
 
     Widget body = AnimatedScale(
-      scale: lifted ? 1.15 : 1,
+      scale: lifted ? 1.08 : 1,
       duration: const Duration(milliseconds: 120),
       child: Container(
-        width: size,
-        height: size,
+        width: config.tabLength,
+        height: config.tabThickness,
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: note.color,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(6),
           border: focused ? Border.all(color: Colors.black, width: 2) : null,
           boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
         ),
         child: Stack(
-          alignment: Alignment.center,
           children: [
+            // Dwell progress fills the tab from the hub end.
             if (hovered && _dwellProgress > 0)
-              SizedBox(
-                width: size - 6,
-                height: size - 6,
-                child: CircularProgressIndicator(
-                  value: _dwellProgress,
-                  strokeWidth: 3,
-                  color: Colors.white,
+              Align(
+                alignment: widget.leftHanded
+                    ? Alignment.centerLeft
+                    : Alignment.centerRight,
+                child: FractionallySizedBox(
+                  widthFactor: _dwellProgress,
+                  heightFactor: 1,
+                  child: const ColoredBox(color: Color(0x55FFFFFF)),
                 ),
               ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(note.icon, color: Colors.white, size: 22),
-                Text(
-                  hovered && _editArmed ? widget.editLabel : note.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 10),
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Icon(note.icon, color: Colors.white, size: 18),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      hovered && _editArmed ? widget.editLabel : note.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -383,14 +398,17 @@ class RadialLauncherState extends State<RadialLauncher>
     }
 
     return Positioned(
-      left: center.dx - size / 2,
-      top: center.dy - size / 2,
-      child: body,
+      left: center.dx - config.tabLength / 2,
+      top: center.dy - config.tabThickness / 2,
+      child: Transform.rotate(
+        angle: geometry.tabRotation(angle),
+        child: body,
+      ),
     );
   }
 
   Widget _addWidget(Offset center) {
-    final double size = widget.config.noteSize * 0.8;
+    final double size = widget.config.addRadius * 2;
     final bool hovered = _hover == LauncherTarget.add;
     final bool enabled = widget.onNew != null;
 
@@ -441,15 +459,14 @@ class RadialLauncherState extends State<RadialLauncher>
     final bool enabled = direction < 0
         ? _scrollOffset > 0
         : _scrollOffset < geometry.maxScrollOffset;
-    // Just inside the arc ends, so they stay on screen with the hub near the
-    // bottom and the right arrow does not crowd the "+".
-    final Offset end = geometry.pointAt(
-      geometry.slotAngle(direction < 0 ? 0 : geometry.noteSlotCount - 1.0),
-      widget.config.radius - widget.config.noteSize * 1.1,
+    // In the margins just past each end of the fan.
+    final Offset spot = geometry.pointAt(
+      direction < 0 ? geometry.slotAngle(-0.9) : geometry.slotAngle(geometry.slotCount - 0.1),
+      widget.config.innerRadius + widget.config.tabLength / 2,
     );
     return Positioned(
-      left: end.dx - 24,
-      top: end.dy - 24,
+      left: spot.dx - 24,
+      top: spot.dy - 24,
       child: IconButton(
         key: ValueKey(direction < 0 ? 'launcher-prev' : 'launcher-next'),
         tooltip: direction < 0 ? 'Previous' : 'Next',
@@ -463,13 +480,13 @@ class RadialLauncherState extends State<RadialLauncher>
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final Size size = constraints.biggest;
-        final Offset hubCenter = widget.hubAlignment.alongSize(size);
         final LauncherGeometry geometry = LauncherGeometry(
           config: widget.config,
-          hubCenter: hubCenter,
+          size: constraints.biggest,
           noteCount: widget.notes.length,
+          leftHanded: widget.leftHanded,
         );
+        final Offset hubCenter = geometry.hubCenter;
         _geometry = geometry;
         _scrollOffset = geometry.clampOffset(_scrollOffset);
         final double hub = widget.config.hubRadius;
@@ -493,9 +510,14 @@ class RadialLauncherState extends State<RadialLauncher>
                   child: IgnorePointer(child: ColoredBox(color: Color(0x33000000))),
                 ),
               if (isOpen) ...[
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(painter: _RingPainter(geometry)),
+                  ),
+                ),
                 for (int index = 0; index < widget.notes.length; index++)
-                  if (geometry.noteCenter(index, _scrollOffset) case final Offset center)
-                    _noteWidget(widget.notes[index], index, center),
+                  if (geometry.tabAngle(index, _scrollOffset) case final double angle)
+                    _noteWidget(geometry, widget.notes[index], index, angle),
                 _addWidget(geometry.addCenter),
                 if (_mode == _Mode.tap && geometry.maxScrollOffset > 0) ...[
                   _arrow(geometry, -1),
@@ -542,3 +564,35 @@ class RadialLauncherState extends State<RadialLauncher>
   }
 }
 
+// The circle the tabs start from, drawn across the quarter the fan sits in.
+class _RingPainter extends CustomPainter {
+  _RingPainter(this.geometry);
+
+  final LauncherGeometry geometry;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double radius = geometry.config.innerRadius - 6;
+    final Path path = Path();
+    const int steps = 48;
+    for (int i = 0; i <= steps; i++) {
+      // From pointing left (bottom edge) to pointing up (side edge).
+      final double angle = 3.141592653589793 * (1 - 0.5 * i / steps);
+      final Offset point = geometry.pointAt(angle, radius);
+      i == 0 ? path.moveTo(point.dx, point.dy) : path.lineTo(point.dx, point.dy);
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = const Color(0xB3FFFFFF),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter oldDelegate) {
+    return oldDelegate.geometry.size != geometry.size ||
+        oldDelegate.geometry.leftHanded != geometry.leftHanded;
+  }
+}
