@@ -80,6 +80,7 @@ class BuiltinTemplates {
       view: const ViewDefinition(
         kind: ViewKind.checklist,
         filterChipsBy: 'category',
+        bucketBy: 'reminderAt',
       ),
       behaviors: const [
         BehaviorDefinition(

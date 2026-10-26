@@ -1,5 +1,6 @@
 import '../l10n/generated/app_localizations.dart';
 import 'list_definition.dart';
+import 'list_vocabulary.dart';
 
 // Turns the l10n keys used by built-in definitions into translated text. The
 // generated AppLocalizations only has one getter per key, so the keys the
@@ -92,5 +93,22 @@ class ListLabels {
 
   String option(FieldOption option) {
     return resolve(option.label, option.labelKey, option.value);
+  }
+
+  String recurrence(RecurrenceFrequency frequency) {
+    switch (frequency) {
+      case RecurrenceFrequency.none:
+        return loc.doesNotRepeat;
+      case RecurrenceFrequency.daily:
+        return loc.daily;
+      case RecurrenceFrequency.weekly:
+        return loc.weekly;
+      case RecurrenceFrequency.monthly:
+        return loc.monthly;
+      case RecurrenceFrequency.yearly:
+        return loc.yearly;
+      case RecurrenceFrequency.custom:
+        return loc.custom;
+    }
   }
 }

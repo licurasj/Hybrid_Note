@@ -183,6 +183,9 @@ class ViewDefinition {
   final String? dateField;
   final TimelineGrouping? timelineGrouping;
   final String? filterChipsBy;
+  // Splits a checklist into Today / Tomorrow / Later by a date field; items
+  // without a date count as Today.
+  final String? bucketBy;
 
   const ViewDefinition({
     required this.kind,
@@ -191,6 +194,7 @@ class ViewDefinition {
     this.dateField,
     this.timelineGrouping,
     this.filterChipsBy,
+    this.bucketBy,
   });
 
   Map<String, dynamic> toJson() {
@@ -201,6 +205,7 @@ class ViewDefinition {
       if (dateField != null) 'dateField': dateField,
       if (timelineGrouping != null) 'timelineGrouping': timelineGrouping!.wire,
       if (filterChipsBy != null) 'filterChipsBy': filterChipsBy,
+      if (bucketBy != null) 'bucketBy': bucketBy,
     };
   }
 
@@ -219,6 +224,7 @@ class ViewDefinition {
               'view timelineGrouping',
             ),
       filterChipsBy: _optionalString(map, 'filterChipsBy', 'view'),
+      bucketBy: _optionalString(map, 'bucketBy', 'view'),
     );
   }
 }
@@ -614,6 +620,14 @@ class ListDefinition {
         view.filterChipsBy,
         'filterChipsBy',
         {FieldType.choice, FieldType.category, FieldType.tags},
+      );
+    }
+
+    if (view.bucketBy != null) {
+      expectField(
+        view.bucketBy,
+        'bucketBy',
+        {FieldType.date, FieldType.dateTime},
       );
     }
 

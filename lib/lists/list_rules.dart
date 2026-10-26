@@ -1,0 +1,363 @@
+import 'package:uuid/uuid.dart';
+
+import 'list_definition.dart';
+import 'list_item.dart';
+import 'list_vocabulary.dart';
+
+// What one user action does to a list: items to write and item ids to delete.
+// Rules and screens produce these; a ListStore applies them.
+class ListChanges {
+  final List<ListItem> saved;
+  final List<String> deletedIds;
+
+  const ListChanges({
+    this.saved = const [],
+    this.deletedIds = const [],
+  });
+
+  bool get isEmpty => saved.isEmpty && deletedIds.isEmpty;
+}
+
+// Runs a definition's behaviours. Pure functions over items, so the same code
+// works on today's storage and on Firestore later.
+class ListRules {
+  static FieldDefinition? _completion(ListDefinition definition) {
+    return definition.fieldWithRole(FieldRole.completion);
+  }
+
+  static bool isCompleted(ListDefinition definition, ListItem item) {
+    final FieldDefinition? completion = _completion(definition);
+    return completion != null && item[completion.key] == true;
+  }
+
+  static ListItem withValues(
+    ListItem item,
+    Map<String, dynamic> changes,
+    DateTime now,
+  ) {
+    return ListItem(
+      id: item.id,
+      listId: item.listId,
+      values: {...item.values, ...changes},
+      createdAt: item.createdAt,
+      updatedAt: now,
+    );
+  }
+
+  static ListChanges setCompleted(
+    ListDefinition definition,
+    ListItem item,
+    bool done,
+    DateTime now,
+  ) {
+    final FieldDefinition? completion = _completion(definition);
+    if (completion == null) {
+      return const ListChanges();
+    }
+
+    return ListChanges(saved: [withValues(item, {completion.key: done}, now)]);
+  }
+
+  // Moving an item to another section starts it fresh (not completed), as
+  // the grocery list always did.
+  static ListChanges moveTo(
+    ListDefinition definition,
+    ListItem item,
+    String field,
+    String value,
+    DateTime now,
+  ) {
+    final FieldDefinition? completion = _completion(definition);
+    return ListChanges(
+      saved: [
+        withValues(item, {
+          field: value,
+          if (completion != null) completion.key: false,
+        }, now),
+      ],
+    );
+  }
+
+  static ListChanges moveAll(
+    ListDefinition definition,
+    List<ListItem> items,
+    BehaviorDefinition behavior,
+    DateTime now,
+  ) {
+    final String? field = behavior.stringParam('field');
+    final String? from = behavior.stringParam('from');
+    final String? to = behavior.stringParam('to');
+    if (field == null || from == null || to == null) {
+      return const ListChanges();
+    }
+
+    final List<ListItem> saved = [];
+    for (final ListItem item in items) {
+      if (item[field] == from) {
+        saved.addAll(moveTo(definition, item, field, to, now).saved);
+      }
+    }
+
+    return ListChanges(saved: saved);
+  }
+
+  // Keeps values consistent before saving: a repeat without a date to repeat
+  // from is turned off, as the task list always did.
+  static ListItem normalize(ListDefinition definition, ListItem item) {
+    final Map<String, dynamic> values = Map<String, dynamic>.from(item.values);
+
+    for (final BehaviorDefinition behavior in definition.behaviors) {
+      if (behavior.kind != BehaviorKind.recurOnClear) {
+        continue;
+      }
+
+      final String? dateField = behavior.stringParam('dateField');
+      final String? recurrenceField = behavior.stringParam('recurrenceField');
+      if (dateField != null &&
+          recurrenceField != null &&
+          values[dateField] == null &&
+          values[recurrenceField] is Map) {
+        values[recurrenceField] = {
+          'frequency': RecurrenceFrequency.none.wire,
+        };
+      }
+    }
+
+    return ListItem(
+      id: item.id,
+      listId: item.listId,
+      values: values,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    );
+  }
+
+  // Removes completed items (only those `inScope` accepts, when given) and
+  // runs copyOnClear and recurOnClear for each.
+  static ListChanges clearCompleted(
+    ListDefinition definition,
+    List<ListItem> items,
+    DateTime now, {
+    bool Function(ListItem item)? inScope,
+    String Function()? newId,
+  }) {
+    final String Function() makeId = newId ?? () => const Uuid().v4();
+    final List<String> deletedIds = [];
+    final List<ListItem> added = [];
+
+    for (final ListItem item in items) {
+      if (!isCompleted(definition, item) ||
+          (inScope != null && !inScope(item))) {
+        continue;
+      }
+
+      deletedIds.add(item.id);
+
+      for (final BehaviorDefinition behavior in definition.behaviors) {
+        final ListItem? created = switch (behavior.kind) {
+          BehaviorKind.copyOnClear => _copyOnClear(
+              definition,
+              behavior,
+              item,
+              [...items.where((other) => !deletedIds.contains(other.id)), ...added],
+              now,
+              makeId,
+            ),
+          BehaviorKind.recurOnClear => _recurOnClear(
+              definition,
+              behavior,
+              item,
+              now,
+            ),
+          BehaviorKind.moveAll || BehaviorKind.clearCompleted => null,
+        };
+
+        if (created != null && !added.any((other) => other.id == created.id)) {
+          added.add(created);
+        }
+      }
+    }
+
+    // A repeat can land on an id that already exists (cleared twice).
+    final Set<String> existing = items.map((item) => item.id).toSet();
+    return ListChanges(
+      saved: added.where((item) => !existing.contains(item.id)).toList(),
+      deletedIds: deletedIds,
+    );
+  }
+
+  static ListItem? _copyOnClear(
+    ListDefinition definition,
+    BehaviorDefinition behavior,
+    ListItem item,
+    List<ListItem> remaining,
+    DateTime now,
+    String Function() makeId,
+  ) {
+    final String? when = behavior.stringParam('when');
+    if (when == null || item[when] != true) {
+      return null;
+    }
+
+    final Map<String, dynamic> where = behavior.mapParam('where');
+    if (where.entries.any((entry) => item[entry.key] != entry.value)) {
+      return null;
+    }
+
+    final Map<String, dynamic> setField = behavior.mapParam('setField');
+    final String? dedupeBy = behavior.stringParam('dedupeBy');
+    if (dedupeBy != null) {
+      final String key = _normalized(item[dedupeBy]);
+      final bool duplicate = remaining.any((other) {
+        return !isCompleted(definition, other) &&
+            setField.entries.every((entry) => other[entry.key] == entry.value) &&
+            _normalized(other[dedupeBy]) == key;
+      });
+      if (duplicate) {
+        return null;
+      }
+    }
+
+    final FieldDefinition? completion = _completion(definition);
+    return ListItem(
+      id: makeId(),
+      listId: item.listId,
+      values: {
+        ...item.values,
+        ...setField,
+        if (completion != null) completion.key: false,
+      },
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
+  static ListItem? _recurOnClear(
+    ListDefinition definition,
+    BehaviorDefinition behavior,
+    ListItem item,
+    DateTime now,
+  ) {
+    final String? dateField = behavior.stringParam('dateField');
+    final String? recurrenceField = behavior.stringParam('recurrenceField');
+    if (dateField == null || recurrenceField == null) {
+      return null;
+    }
+
+    final Object? rawDate = item[dateField];
+    final Object? recurrence = item[recurrenceField];
+    if (rawDate is! String || recurrence is! Map) {
+      return null;
+    }
+
+    final DateTime? date = DateTime.tryParse(rawDate);
+    final RecurrenceFrequency? frequency = enumFromWire(
+      RecurrenceFrequency.values,
+      recurrence['frequency'],
+    );
+    if (date == null || frequency == null) {
+      return null;
+    }
+
+    final DateTime? next = nextOccurrence(
+      date,
+      frequency,
+      recurrence['customDays'] as int?,
+      now,
+    );
+    if (next == null) {
+      return null;
+    }
+
+    // Deterministic id, so two devices clearing the same item create the
+    // same next occurrence instead of two.
+    final String nextId = 'repeat-${item.id}-${next.millisecondsSinceEpoch}';
+    final FieldDefinition? completion = _completion(definition);
+    final Map<String, dynamic> values = {
+      ...item.values,
+      dateField: next.toIso8601String(),
+      if (completion != null) completion.key: false,
+    };
+
+    for (final FieldDefinition field in definition.fields) {
+      final Object? subItems = values[field.key];
+      if (field.type == FieldType.checklist && subItems is List) {
+        values[field.key] = [
+          for (final Object? entry in subItems)
+            if (entry is Map)
+              {
+                ...entry,
+                'id': '$nextId-subtask-${entry['id']}',
+                'done': false,
+                'createdAt': now.toIso8601String(),
+                'updatedAt': now.toIso8601String(),
+              },
+        ];
+      }
+    }
+
+    return ListItem(
+      id: nextId,
+      listId: item.listId,
+      values: values,
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
+
+  // The first occurrence after `now`, stepping in the local time zone so a
+  // daily 8:00 stays at 8:00. Months and years clamp to the last day.
+  static DateTime? nextOccurrence(
+    DateTime from,
+    RecurrenceFrequency frequency,
+    int? customDays,
+    DateTime now,
+  ) {
+    DateTime? step(DateTime local) {
+      switch (frequency) {
+        case RecurrenceFrequency.none:
+          return null;
+        case RecurrenceFrequency.daily:
+          return local.add(const Duration(days: 1));
+        case RecurrenceFrequency.weekly:
+          return local.add(const Duration(days: 7));
+        case RecurrenceFrequency.monthly:
+          return _clamped(local, local.year, local.month + 1);
+        case RecurrenceFrequency.yearly:
+          return _clamped(local, local.year + 1, local.month);
+        case RecurrenceFrequency.custom:
+          if (customDays == null || customDays <= 0) {
+            return null;
+          }
+          return local.add(Duration(days: customDays));
+      }
+    }
+
+    DateTime? next = step(from.toLocal());
+    int guard = 0;
+    while (next != null && !next.toUtc().isAfter(now) && guard < 1000) {
+      next = step(next);
+      guard++;
+    }
+
+    return next?.toUtc();
+  }
+
+  static DateTime _clamped(DateTime local, int year, int month) {
+    final int maxDay = DateTime(year, month + 1, 0).day;
+    return DateTime(
+      year,
+      month,
+      local.day > maxDay ? maxDay : local.day,
+      local.hour,
+      local.minute,
+      local.second,
+      local.millisecond,
+      local.microsecond,
+    );
+  }
+
+  static String _normalized(Object? value) {
+    return value?.toString().trim().toLowerCase() ?? '';
+  }
+}

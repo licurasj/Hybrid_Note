@@ -1,86 +1,261 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
+import 'package:intl/intl.dart';
 
 import '../app_colors.dart';
 import '../l10n/generated/app_localizations.dart';
+import 'generic_item_dialog.dart';
 import 'list_definition.dart';
 import 'list_item.dart';
 import 'list_labels.dart';
+import 'list_rules.dart';
+import 'list_store.dart';
 import 'list_vocabulary.dart';
 
-// Shows any list from its definition: items grouped or in one column, a tile
-// per item, and an add/edit dialog built from the fields. Where the items come
-// from and how changes are saved is up to the caller, so the same screen can
-// sit on today's AppCubit or on the future Firestore storage.
-//
-// Supported so far: grouped view (other views fall back to one column) and
-// editors for text, longText, url, enum, counter, number, rating, checkbox and
-// toggle. Fields of other types are not shown; their values are kept.
-class GenericListScreen extends StatelessWidget {
-  const GenericListScreen({
-    super.key,
-    required this.definition,
-    required this.items,
+// The per-list words a screen needs that are not part of the definition.
+class GenericListTexts {
+  const GenericListTexts({
+    required this.title,
     required this.emptyText,
     required this.addTooltip,
     required this.addDialogTitle,
     required this.editDialogTitle,
-    required this.onSave,
-    required this.onDelete,
-    required this.onRefresh,
-    this.title,
   });
 
-  final ListDefinition definition;
-  final List<ListItem> items;
-  // App bar title; defaults to the list's name.
-  final String? title;
+  final String title;
   final String emptyText;
   final String addTooltip;
   final String addDialogTitle;
   final String editDialogTitle;
-  final Future<void> Function(ListItem item, {required bool isNew}) onSave;
-  final Future<void> Function(ListItem item) onDelete;
-  final Future<void> Function() onRefresh;
+}
 
-  static const Set<FieldType> editableTypes = {
-    FieldType.text,
-    FieldType.longText,
-    FieldType.url,
-    FieldType.choice,
-    FieldType.counter,
-    FieldType.number,
-    FieldType.rating,
-    FieldType.checkbox,
-    FieldType.toggle,
-  };
+// Shows any list from its definition and writes every change through a
+// ListStore. The look is deliberately plain until the design pass (D-3).
+class GenericListScreen extends StatefulWidget {
+  const GenericListScreen({
+    super.key,
+    required this.definition,
+    required this.items,
+    required this.store,
+    required this.texts,
+  });
 
-  FieldDefinition get _primaryField {
-    return definition.fields.firstWhere((field) => field.primary);
+  final ListDefinition definition;
+  final List<ListItem> items;
+  final ListStore store;
+  final GenericListTexts texts;
+
+  @override
+  State<GenericListScreen> createState() {
+    return _GenericListScreenState();
+  }
+}
+
+class _GenericListScreenState extends State<GenericListScreen> {
+  // Selected filter chip value; null shows everything.
+  String? _filter;
+
+  ListDefinition get _definition => widget.definition;
+
+  FieldDefinition? get _completion =>
+      _definition.fieldWithRole(FieldRole.completion);
+
+  FieldDefinition? get _filterField {
+    final String? key = _definition.view.filterChipsBy;
+    return key == null ? null : _definition.field(key);
   }
 
-  Future<void> _showItemDialog(BuildContext context, {ListItem? item}) async {
+  BehaviorDefinition? _behavior(BehaviorKind kind) {
+    for (final BehaviorDefinition behavior in _definition.behaviors) {
+      if (behavior.kind == kind) {
+        return behavior;
+      }
+    }
+    return null;
+  }
+
+  bool _matchesFilter(ListItem item) {
+    final FieldDefinition? field = _filterField;
+    if (_filter == null || field == null) {
+      return true;
+    }
+    final Object? value = item[field.key];
+    return value is List ? value.contains(_filter) : value == _filter;
+  }
+
+  Future<void> _apply(ListChanges changes) async {
+    if (!changes.isEmpty) {
+      await widget.store.apply(changes);
+    }
+  }
+
+  Future<void> _showItemDialog({ListItem? item}) async {
+    final FieldDefinition? filterField = _filterField;
     final ListItem? result = await showDialog<ListItem>(
       context: context,
       builder: (_) {
         return GenericItemDialog(
-          definition: definition,
+          definition: _definition,
           item: item,
-          title: item == null ? addDialogTitle : editDialogTitle,
+          title: item == null
+              ? widget.texts.addDialogTitle
+              : widget.texts.editDialogTitle,
+          initialValues: {
+            if (filterField != null && _filter != null) filterField.key: _filter,
+          },
         );
       },
     );
 
-    if (result != null) {
-      await onSave(result, isNew: item == null);
+    if (result == null) {
+      return;
     }
+
+    // New user options (a category typed in the dialog) are added first so
+    // the store knows them when the item arrives.
+    for (final FieldDefinition field in _definition.fields) {
+      final Object? value = result[field.key];
+      if (field.type.hasUserOptions) {
+        final List<Object?> values = value is List ? value : [value];
+        for (final Object? entry in values) {
+          if (entry is String && entry.isNotEmpty && !field.hasOption(entry)) {
+            await widget.store.addOption(_definition.id, field.key, entry);
+          }
+        }
+      }
+    }
+
+    await _apply(ListChanges(saved: [result]));
+  }
+
+  Future<void> _clearCompleted(bool Function(ListItem item) inScope) {
+    return _apply(
+      ListRules.clearCompleted(
+        _definition,
+        widget.items,
+        DateTime.now().toUtc(),
+        inScope: inScope,
+      ),
+    );
+  }
+
+  Future<void> _toggleSubItem(
+    ListItem item,
+    FieldDefinition field,
+    String subId,
+    bool done,
+  ) {
+    final String now = DateTime.now().toUtc().toIso8601String();
+    final Object? raw = item[field.key];
+    final List<Map<String, dynamic>> subItems = [
+      if (raw is List)
+        for (final Object? entry in raw)
+          if (entry is Map)
+            entry['id'] == subId
+                ? {...Map<String, dynamic>.from(entry), 'done': done, 'updatedAt': now}
+                : Map<String, dynamic>.from(entry),
+    ];
+    return _apply(
+      ListChanges(
+        saved: [
+          ListRules.withValues(item, {field.key: subItems}, DateTime.now().toUtc()),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _manageOptions(FieldDefinition field, ListLabels labels) async {
+    final AppLocalizations loc = labels.loc;
+    final TextEditingController controller = TextEditingController();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(12),
+            children: [
+              Text(loc.categories, style: Theme.of(context).textTheme.titleMedium),
+              for (final FieldOption option in field.options)
+                ListTile(
+                  title: Text(labels.option(option)),
+                  trailing: IconButton(
+                    tooltip: loc.deleteCategory,
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () async {
+                      Navigator.of(sheetContext).pop();
+                      await widget.store.removeOption(
+                        _definition.id,
+                        field.key,
+                        option.value,
+                      );
+                    },
+                  ),
+                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      decoration: InputDecoration(labelText: loc.categoryName),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: loc.createCategory,
+                    icon: const Icon(Icons.add),
+                    onPressed: () async {
+                      final String name = controller.text.trim();
+                      if (name.isEmpty) {
+                        return;
+                      }
+                      Navigator.of(sheetContext).pop();
+                      await widget.store.addOption(_definition.id, field.key, name);
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatDate(FieldType type, DateTime date) {
+    final String locale = Localizations.localeOf(context).toLanguageTag();
+    final DateFormat format = type == FieldType.dateTime
+        ? DateFormat.yMMMd(locale).add_jm()
+        : DateFormat.yMMMd(locale);
+    return format.format(date.toLocal());
+  }
+
+  // The recurrence field that repeats the given date field, if any.
+  FieldDefinition? _recurrenceFor(String dateField) {
+    for (final BehaviorDefinition behavior in _definition.behaviors) {
+      if (behavior.kind == BehaviorKind.recurOnClear &&
+          behavior.stringParam('dateField') == dateField) {
+        return _definition.field(behavior.stringParam('recurrenceField') ?? '');
+      }
+    }
+    return null;
   }
 
   String _summary(ListLabels labels, ListItem item) {
+    final AppLocalizations loc = labels.loc;
     final List<String> parts = [];
 
-    for (final FieldDefinition field in definition.fields) {
-      if (field.primary || !field.isVisibleFor(item.values)) {
+    if (_definition.view.kind == ViewKind.timeline) {
+      final DateTime? date = _timelineDate(item);
+      if (date != null) {
+        parts.add(DateFormat.MMMd(Localizations.localeOf(context).toLanguageTag())
+            .format(date.toLocal()));
+      }
+    }
+
+    for (final FieldDefinition field in _definition.fields) {
+      if (field.primary ||
+          field.role == FieldRole.completion ||
+          !field.isVisibleFor(item.values)) {
         continue;
       }
 
@@ -110,10 +285,38 @@ class GenericListScreen extends StatelessWidget {
           if (value is String && value.trim().isNotEmpty) {
             parts.add(value.trim());
           }
+        case FieldType.tags:
+          if (value is List && value.isNotEmpty) {
+            parts.add(value.join(', '));
+          }
         case FieldType.date:
         case FieldType.dateTime:
-        case FieldType.tags:
+          final DateTime? date = value is String ? DateTime.tryParse(value) : null;
+          if (date == null) {
+            break;
+          }
+          final String text = _formatDate(field.type, date);
+          final FieldDefinition? recurrenceField = _recurrenceFor(field.key);
+          final Object? recurrence =
+              recurrenceField == null ? null : item[recurrenceField.key];
+          final RecurrenceFrequency frequency = enumFromWire(
+                RecurrenceFrequency.values,
+                recurrence is Map ? recurrence['frequency'] : null,
+              ) ??
+              RecurrenceFrequency.none;
+          if (frequency == RecurrenceFrequency.none) {
+            parts.add(loc.reminderText(text));
+          } else if (frequency == RecurrenceFrequency.custom) {
+            final Object? days = (recurrence as Map)['customDays'];
+            parts.add(loc.repeatsEveryDays(text, days is int ? days : 1));
+          } else {
+            parts.add(loc.repeats(text, labels.recurrence(frequency).toLowerCase()));
+          }
         case FieldType.checklist:
+          if (value is List && value.isNotEmpty) {
+            final int done = value.where((entry) => entry is Map && entry['done'] == true).length;
+            parts.add(loc.subtaskProgress(done, value.length));
+          }
         case FieldType.recurrence:
           break;
       }
@@ -122,449 +325,497 @@ class GenericListScreen extends StatelessWidget {
     return parts.join(' | ');
   }
 
-  // Groups in option order for an enum, first-seen order otherwise. Items
-  // whose value matches no group go last, so nothing is ever hidden.
-  List<MapEntry<String?, List<ListItem>>> _groups(
-    ListLabels labels,
-    List<ListItem> sorted,
-  ) {
-    final String? groupBy =
-        definition.view.kind == ViewKind.grouped ? definition.view.groupBy : null;
-    final FieldDefinition? groupField =
-        groupBy == null ? null : definition.field(groupBy);
+  DateTime? _timelineDate(ListItem item) {
+    final String? key = _definition.view.dateField;
+    if (key == 'createdAt') {
+      return item.createdAt;
+    }
+    if (key == 'updatedAt') {
+      return item.updatedAt;
+    }
+    final Object? value = key == null ? null : item[key];
+    return value is String ? DateTime.tryParse(value) : null;
+  }
 
-    if (groupField == null) {
-      return [MapEntry(null, sorted)];
+  Widget _header(String text, {List<Widget> actions = const []}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+          ...actions,
+        ],
+      ),
+    );
+  }
+
+  Widget _itemCard(ListLabels labels, ListItem item) {
+    final AppLocalizations loc = labels.loc;
+    final FieldDefinition? completion = _completion;
+    final bool done = completion != null && item[completion.key] == true;
+    final String summary = _summary(labels, item);
+    final Object? primary =
+        item[_definition.fields.firstWhere((field) => field.primary).key];
+    final FieldDefinition? sectionField = _definition.view.kind == ViewKind.sectioned
+        ? _definition.field(_definition.view.sectionBy ?? '')
+        : null;
+    final FieldDefinition? checklistField = _definition.fields
+        .where((field) => field.type == FieldType.checklist)
+        .firstOrNull;
+    final Object? subItems =
+        checklistField == null ? null : item[checklistField.key];
+
+    final Widget? leading = completion == null
+        ? null
+        : Checkbox(
+            value: done,
+            onChanged: (value) => _apply(
+              ListRules.setCompleted(
+                _definition,
+                item,
+                value ?? false,
+                DateTime.now().toUtc(),
+              ),
+            ),
+          );
+    final Widget title = Text(
+      primary is String ? primary : '',
+      overflow: TextOverflow.ellipsis,
+      maxLines: 2,
+    );
+    final Widget? subtitle = summary.isEmpty
+        ? null
+        : Text(summary, overflow: TextOverflow.ellipsis, maxLines: 3);
+
+    final Widget menu = PopupMenuButton<String>(
+      onSelected: (value) {
+        if (value == 'edit') {
+          _showItemDialog(item: item);
+        } else if (value == 'delete') {
+          _apply(ListChanges(deletedIds: [item.id]));
+        } else if (value == 'clear') {
+          _clearCompleted((other) => other.id == item.id);
+        } else if (value.startsWith('move:') && sectionField != null) {
+          _apply(
+            ListRules.moveTo(
+              _definition,
+              item,
+              sectionField.key,
+              value.substring('move:'.length),
+              DateTime.now().toUtc(),
+            ),
+          );
+        }
+      },
+      itemBuilder: (context) {
+        PopupMenuItem<String> entry(String value, IconData icon, String text) {
+          return PopupMenuItem(
+            value: value,
+            child: ListTile(
+              leading: Icon(icon),
+              title: Text(text),
+              contentPadding: EdgeInsets.zero,
+            ),
+          );
+        }
+
+        return [
+          entry('edit', Icons.edit_outlined, loc.edit),
+          if (sectionField != null)
+            for (final FieldOption option in sectionField.options)
+              if (item[sectionField.key] != option.value)
+                entry('move:${option.value}', Icons.drive_file_move_outline,
+                    labels.option(option)),
+          if (done && _behavior(BehaviorKind.clearCompleted) != null)
+            entry('clear', Icons.cleaning_services_outlined, loc.clear),
+          entry('delete', Icons.delete_outline, loc.delete),
+        ];
+      },
+    );
+
+    final ShapeBorder shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(6),
+    );
+
+    if (checklistField != null && subItems is List && subItems.isNotEmpty) {
+      return Card(
+        shape: shape,
+        child: ExpansionTile(
+          key: PageStorageKey('item-${item.id}'),
+          leading: leading,
+          title: title,
+          subtitle: subtitle,
+          trailing: menu,
+          shape: const Border(),
+          children: [
+            for (final Object? entry in subItems)
+              if (entry is Map)
+                CheckboxListTile(
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: entry['done'] == true,
+                  title: Text('${entry['title'] ?? ''}'),
+                  onChanged: (value) => _toggleSubItem(
+                    item,
+                    checklistField,
+                    '${entry['id']}',
+                    value ?? false,
+                  ),
+                ),
+          ],
+        ),
+      );
     }
 
-    final List<MapEntry<String?, List<ListItem>>> groups = [];
+    return Card(
+      shape: shape,
+      child: ListTile(
+        leading: leading,
+        title: title,
+        subtitle: subtitle,
+        trailing: menu,
+        onTap: () => _showItemDialog(item: item),
+      ),
+    );
+  }
+
+  List<Widget> _filterChips(ListLabels labels) {
+    final FieldDefinition? field = _filterField;
+    if (field == null) {
+      return const [];
+    }
+
+    int count(String? value) {
+      return widget.items.where((item) {
+        if (value == null) {
+          return true;
+        }
+        final Object? itemValue = item[field.key];
+        return itemValue is List ? itemValue.contains(value) : itemValue == value;
+      }).length;
+    }
+
+    return [
+      SizedBox(
+        height: 48,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: ChoiceChip(
+                label: Text('${labels.loc.allMyTasks} (${count(null)})'),
+                selected: _filter == null,
+                onSelected: (_) => setState(() => _filter = null),
+              ),
+            ),
+            for (final FieldOption option in field.options)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: ChoiceChip(
+                  label: Text('${labels.option(option)} (${count(option.value)})'),
+                  selected: _filter == option.value,
+                  onSelected: (_) => setState(() => _filter = option.value),
+                ),
+              ),
+            if (field.type.hasUserOptions)
+              IconButton(
+                tooltip: labels.loc.categories,
+                icon: const Icon(Icons.tune),
+                onPressed: () => _manageOptions(field, labels),
+              ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _grouped(ListLabels labels, List<ListItem> sorted) {
+    final FieldDefinition? groupField =
+        _definition.field(_definition.view.groupBy ?? '');
+    if (groupField == null) {
+      return [for (final ListItem item in sorted) _itemCard(labels, item)];
+    }
+
+    final List<Widget> children = [];
     final Set<String> placed = {};
 
     void addGroup(String header, bool Function(ListItem item) matches) {
-      final List<ListItem> members =
-          sorted.where((item) => !placed.contains(item.id) && matches(item)).toList();
-      if (members.isNotEmpty) {
-        placed.addAll(members.map((item) => item.id));
-        groups.add(MapEntry(header, members));
+      final List<ListItem> members = sorted
+          .where((item) => !placed.contains(item.id) && matches(item))
+          .toList();
+      if (members.isEmpty) {
+        return;
       }
+      placed.addAll(members.map((item) => item.id));
+      children.add(_header('$header (${members.length})'));
+      children.addAll(members.map((item) => _itemCard(labels, item)));
     }
 
     for (final FieldOption option in groupField.options) {
       addGroup(labels.option(option), (item) => item[groupField.key] == option.value);
     }
-
     for (final ListItem item in sorted) {
       final Object? value = item[groupField.key];
       if (!placed.contains(item.id) && value is String && value.isNotEmpty) {
         addGroup(value, (other) => other[groupField.key] == value);
       }
     }
-
+    // Items matching no group go last, so nothing is ever hidden.
     addGroup('—', (item) => true);
-    return groups;
+    return children;
+  }
+
+  List<Widget> _sectioned(ListLabels labels, List<ListItem> sorted) {
+    final FieldDefinition? sectionField =
+        _definition.field(_definition.view.sectionBy ?? '');
+    if (sectionField == null) {
+      return [for (final ListItem item in sorted) _itemCard(labels, item)];
+    }
+
+    final BehaviorDefinition? moveAll = _behavior(BehaviorKind.moveAll);
+    final bool canClear = _behavior(BehaviorKind.clearCompleted) != null;
+    final List<Widget> children = [];
+
+    for (final FieldOption option in sectionField.options) {
+      final List<ListItem> members =
+          sorted.where((item) => item[sectionField.key] == option.value).toList();
+      final int ticked =
+          members.where((item) => ListRules.isCompleted(_definition, item)).length;
+      final bool movesFromHere = moveAll != null &&
+          moveAll.stringParam('field') == sectionField.key &&
+          moveAll.stringParam('from') == option.value &&
+          members.isNotEmpty;
+      final FieldOption? target = movesFromHere
+          ? sectionField.options
+              .where((other) => other.value == moveAll.stringParam('to'))
+              .firstOrNull
+          : null;
+
+      children.add(
+        _header(
+          '${labels.option(option)} (${members.length})',
+          actions: [
+            if (canClear && ticked > 0)
+              TextButton(
+                onPressed: () => _clearCompleted(
+                  (item) => item[sectionField.key] == option.value,
+                ),
+                child: Text(
+                  '${labels.loc.clearTicked} (${labels.loc.tickedCount(ticked)})',
+                ),
+              ),
+            if (target != null)
+              TextButton.icon(
+                icon: const Icon(Icons.arrow_upward),
+                label: Text(labels.option(target)),
+                onPressed: () => _apply(
+                  ListRules.moveAll(
+                    _definition,
+                    widget.items,
+                    moveAll!,
+                    DateTime.now().toUtc(),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+
+      if (members.isEmpty) {
+        children.add(
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Text('—'),
+          ),
+        );
+      }
+      children.addAll(members.map((item) => _itemCard(labels, item)));
+    }
+
+    return children;
+  }
+
+  List<Widget> _timeline(ListLabels labels, List<ListItem> sorted) {
+    final String locale = Localizations.localeOf(context).toLanguageTag();
+    final bool byMonth =
+        _definition.view.timelineGrouping != TimelineGrouping.year;
+    final Map<int, Map<int, List<ListItem>>> years = {};
+
+    for (final ListItem item in sorted) {
+      final DateTime date = (_timelineDate(item) ?? item.createdAt).toLocal();
+      years
+          .putIfAbsent(date.year, () => {})
+          .putIfAbsent(byMonth ? date.month : 0, () => [])
+          .add(item);
+    }
+
+    final List<int> yearKeys = years.keys.toList()..sort((a, b) => b - a);
+    return [
+      for (final int year in yearKeys)
+        ExpansionTile(
+          key: PageStorageKey('year-$year'),
+          initiallyExpanded: year == yearKeys.first,
+          title: Text('$year'),
+          children: [
+            for (final int month in years[year]!.keys.toList()..sort((a, b) => b - a))
+              if (!byMonth)
+                ...years[year]![month]!.map((item) => _itemCard(labels, item))
+              else
+                ExpansionTile(
+                  key: PageStorageKey('month-$year-$month'),
+                  initiallyExpanded: year == yearKeys.first,
+                  title: Text(DateFormat.MMMM(locale).format(DateTime(year, month))),
+                  children: [
+                    for (final ListItem item in years[year]![month]!)
+                      _itemCard(labels, item),
+                  ],
+                ),
+          ],
+        ),
+    ];
+  }
+
+  List<Widget> _checklist(ListLabels labels, List<ListItem> sorted) {
+    final FieldDefinition? bucketField =
+        _definition.field(_definition.view.bucketBy ?? '');
+    if (bucketField == null) {
+      return [for (final ListItem item in sorted) _itemCard(labels, item)];
+    }
+
+    final DateTime now = DateTime.now();
+    bool sameDay(DateTime a, DateTime b) =>
+        a.year == b.year && a.month == b.month && a.day == b.day;
+    int bucket(ListItem item) {
+      final Object? raw = item[bucketField.key];
+      final DateTime? date = raw is String ? DateTime.tryParse(raw)?.toLocal() : null;
+      if (date == null || sameDay(date, now)) {
+        return 0;
+      }
+      return sameDay(date, now.add(const Duration(days: 1))) ? 1 : 2;
+    }
+
+    final List<String> names = [labels.loc.today, labels.loc.tomorrow, labels.loc.later];
+    final List<Widget> children = [];
+    for (int index = 0; index < names.length; index++) {
+      final List<ListItem> members =
+          sorted.where((item) => bucket(item) == index).toList();
+      if (members.isEmpty) {
+        continue;
+      }
+      children.add(_header('${names[index]} (${members.length})'));
+      children.addAll(members.map((item) => _itemCard(labels, item)));
+    }
+    return children;
+  }
+
+  // Checklists show open items first, soonest date first; everything else
+  // shows newest first.
+  List<ListItem> _sorted(List<ListItem> items) {
+    final List<ListItem> sorted = [...items]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    if (_definition.view.kind != ViewKind.checklist) {
+      return sorted;
+    }
+
+    final String? dateKey = _definition.view.bucketBy;
+    DateTime? dateOf(ListItem item) {
+      final Object? raw = dateKey == null ? null : item[dateKey];
+      return raw is String ? DateTime.tryParse(raw) : null;
+    }
+
+    sorted.sort((a, b) {
+      final int doneOrder = (ListRules.isCompleted(_definition, a) ? 1 : 0) -
+          (ListRules.isCompleted(_definition, b) ? 1 : 0);
+      if (doneOrder != 0) {
+        return doneOrder;
+      }
+      final DateTime? dateA = dateOf(a);
+      final DateTime? dateB = dateOf(b);
+      if (dateA != null && dateB != null) {
+        return dateA.compareTo(dateB);
+      }
+      if (dateA != null || dateB != null) {
+        return dateA == null ? -1 : 1;
+      }
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return sorted;
   }
 
   @override
   Widget build(BuildContext context) {
     final AppLocalizations loc = AppLocalizations.of(context);
     final ListLabels labels = ListLabels(loc);
-    final List<ListItem> sorted = [...items]
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final List<MapEntry<String?, List<ListItem>>> groups =
-        _groups(labels, sorted);
-
-    final List<Widget> children = [];
-    for (final MapEntry<String?, List<ListItem>> group in groups) {
-      if (group.key != null) {
-        children.add(
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
-            child: Text(
-              '${group.key} (${group.value.length})',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-        );
-      }
-
-      for (final ListItem item in group.value) {
-        children.add(_itemCard(context, loc, labels, item));
-      }
+    final FieldDefinition? filterField = _filterField;
+    if (filterField != null && _filter != null && !filterField.hasOption(_filter)) {
+      _filter = null;
     }
+
+    final List<ListItem> visible = _sorted(widget.items.where(_matchesFilter).toList());
+    final bool canClearAll = _definition.view.kind == ViewKind.checklist &&
+        _behavior(BehaviorKind.clearCompleted) != null &&
+        visible.any((item) => ListRules.isCompleted(_definition, item));
+
+    final List<Widget> content = switch (_definition.view.kind) {
+      ViewKind.grouped => _grouped(labels, visible),
+      ViewKind.sectioned => _sectioned(labels, visible),
+      ViewKind.timeline => _timeline(labels, visible),
+      ViewKind.checklist => _checklist(labels, visible),
+      ViewKind.table || ViewKind.cards => [
+          for (final ListItem item in visible) _itemCard(labels, item),
+        ],
+    };
+
+    final bool showEmpty =
+        visible.isEmpty && _definition.view.kind != ViewKind.sectioned;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(title ?? labels.listName(definition)),
+        title: Text(widget.texts.title),
+        actions: [
+          if (canClearAll)
+            IconButton(
+              tooltip: loc.clear,
+              icon: const Icon(Icons.cleaning_services_outlined),
+              onPressed: () => _clearCompleted(_matchesFilter),
+            ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         shape: const CircleBorder(),
         backgroundColor: AppColors.logoBlue,
         foregroundColor: Colors.white,
         onPressed: () {
-          _showItemDialog(context);
+          _showItemDialog();
         },
-        tooltip: addTooltip,
+        tooltip: widget.texts.addTooltip,
         child: const Icon(Icons.add),
       ),
       body: RefreshIndicator(
-        onRefresh: onRefresh,
-        child: items.isEmpty
-            ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(12),
-                children: [
-                  const SizedBox(height: 260),
-                  Center(
-                    child: Text(emptyText),
-                  ),
-                ],
-              )
-            : ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(12),
-                children: children,
-              ),
-      ),
-    );
-  }
-
-  Widget _itemCard(
-    BuildContext context,
-    AppLocalizations loc,
-    ListLabels labels,
-    ListItem item,
-  ) {
-    final String summary = _summary(labels, item);
-    final Object? primary = item[_primaryField.key];
-
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: ListTile(
-        title: Text(
-          primary is String ? primary : '',
-          overflow: TextOverflow.ellipsis,
-          maxLines: 2,
-        ),
-        subtitle: summary.isEmpty
-            ? null
-            : Text(
-                summary,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 3,
-              ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'edit') {
-              _showItemDialog(context, item: item);
-            }
-
-            if (value == 'delete') {
-              onDelete(item);
-            }
-          },
-          itemBuilder: (context) {
-            return [
-              PopupMenuItem(
-                value: 'edit',
-                child: ListTile(
-                  leading: const Icon(Icons.edit_outlined),
-                  title: Text(loc.edit),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: ListTile(
-                  leading: const Icon(Icons.delete_outline),
-                  title: Text(loc.delete),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ];
-          },
-        ),
-      ),
-    );
-  }
-}
-
-// Add/edit dialog generated from the definition's fields. Pops the edited
-// item, or nothing when cancelled.
-class GenericItemDialog extends StatefulWidget {
-  const GenericItemDialog({
-    super.key,
-    required this.definition,
-    required this.title,
-    this.item,
-  });
-
-  final ListDefinition definition;
-  final String title;
-  final ListItem? item;
-
-  @override
-  State<GenericItemDialog> createState() {
-    return _GenericItemDialogState();
-  }
-}
-
-class _GenericItemDialogState extends State<GenericItemDialog> {
-  late final Map<String, dynamic> _values;
-  final Map<String, TextEditingController> _controllers = {};
-  String? _error;
-
-  bool _isTextType(FieldType type) {
-    return type == FieldType.text ||
-        type == FieldType.longText ||
-        type == FieldType.url;
-  }
-
-  bool _isNumberType(FieldType type) {
-    return type == FieldType.counter ||
-        type == FieldType.number ||
-        type == FieldType.rating;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _values = Map<String, dynamic>.from(widget.item?.values ?? const {});
-
-    for (final FieldDefinition field in widget.definition.fields) {
-      if (widget.item == null && field.defaultValue != null) {
-        _values[field.key] = field.defaultValue;
-      }
-
-      final Object? value = _values[field.key];
-      if (_isTextType(field.type)) {
-        _controllers[field.key] = TextEditingController(
-          text: value is String ? value : '',
-        );
-      } else if (_isNumberType(field.type)) {
-        // 0 shows as blank, as on the old screens.
-        _controllers[field.key] = TextEditingController(
-          text: value is num && value != 0 ? '$value' : '',
-        );
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    for (final TextEditingController controller in _controllers.values) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-
-  bool get _requiredFieldsFilled {
-    for (final FieldDefinition field in widget.definition.fields) {
-      final TextEditingController? controller = _controllers[field.key];
-      if (field.required &&
-          controller != null &&
-          controller.text.trim().isEmpty) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  void _save() {
-    final Map<String, dynamic> values = Map<String, dynamic>.from(_values);
-
-    for (final FieldDefinition field in widget.definition.fields) {
-      final TextEditingController? controller = _controllers[field.key];
-      if (controller == null) {
-        continue;
-      }
-
-      final String text = controller.text.trim();
-      if (_isTextType(field.type)) {
-        values[field.key] = text;
-      } else if (field.type == FieldType.number) {
-        final num? parsed = num.tryParse(text);
-        if (parsed == null) {
-          values.remove(field.key);
-        } else {
-          values[field.key] = parsed;
-        }
-      } else {
-        values[field.key] = int.tryParse(text) ?? 0;
-      }
-    }
-
-    for (final FieldDefinition field in widget.definition.fields) {
-      if (!field.isVisibleFor(values)) {
-        values.remove(field.key);
-      }
-    }
-
-    final DateTime now = DateTime.now().toUtc();
-    final ListItem result = ListItem(
-      id: widget.item?.id ?? const Uuid().v4(),
-      listId: widget.definition.id,
-      values: values,
-      createdAt: widget.item?.createdAt ?? now,
-      updatedAt: now,
-    );
-
-    final List<String> errors = result.validateAgainst(widget.definition);
-    if (errors.isNotEmpty) {
-      setState(() {
-        _error = errors.first;
-      });
-      return;
-    }
-
-    Navigator.of(context).pop(result);
-  }
-
-  Widget? _editor(ListLabels labels, FieldDefinition field) {
-    final String label = labels.field(field) + (field.required ? ' *' : '');
-    final TextEditingController? controller = _controllers[field.key];
-
-    switch (field.type) {
-      case FieldType.text:
-      case FieldType.longText:
-      case FieldType.url:
-        return TextField(
-          key: ValueKey('field-${field.key}'),
-          controller: controller,
-          maxLines: field.type == FieldType.longText ? 3 : 1,
-          keyboardType:
-              field.type == FieldType.url ? TextInputType.url : TextInputType.text,
-          onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(labelText: label),
-        );
-      case FieldType.counter:
-      case FieldType.number:
-      case FieldType.rating:
-        return TextField(
-          key: ValueKey('field-${field.key}'),
-          controller: controller,
-          keyboardType: TextInputType.numberWithOptions(
-            decimal: field.type == FieldType.number,
-          ),
-          decoration: InputDecoration(labelText: label),
-        );
-      case FieldType.choice:
-        final Object? current = _values[field.key];
-        return DropdownButtonFormField<String>(
-          key: ValueKey('field-${field.key}'),
-          initialValue: field.hasOption(current) ? current as String : null,
-          isExpanded: true,
-          decoration: InputDecoration(labelText: label),
-          items: [
-            for (final FieldOption option in field.options)
-              DropdownMenuItem(
-                value: option.value,
-                child: Text(labels.option(option)),
-              ),
+        onRefresh: widget.store.refresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+          children: [
+            ..._filterChips(labels),
+            if (showEmpty) ...[
+              const SizedBox(height: 200),
+              Center(child: Text(widget.texts.emptyText)),
+            ] else
+              ...content,
           ],
-          onChanged: (value) {
-            setState(() {
-              _values[field.key] = value;
-            });
-          },
-        );
-      case FieldType.checkbox:
-        return CheckboxListTile(
-          key: ValueKey('field-${field.key}'),
-          contentPadding: EdgeInsets.zero,
-          title: Text(label),
-          value: _values[field.key] == true,
-          onChanged: (value) {
-            setState(() {
-              _values[field.key] = value ?? false;
-            });
-          },
-        );
-      case FieldType.toggle:
-        return SwitchListTile(
-          key: ValueKey('field-${field.key}'),
-          contentPadding: EdgeInsets.zero,
-          title: Text(label),
-          value: _values[field.key] == true,
-          onChanged: (value) {
-            setState(() {
-              _values[field.key] = value;
-            });
-          },
-        );
-      case FieldType.date:
-      case FieldType.dateTime:
-      case FieldType.category:
-      case FieldType.tags:
-      case FieldType.checklist:
-      case FieldType.recurrence:
-        return null;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final AppLocalizations loc = AppLocalizations.of(context);
-    final ListLabels labels = ListLabels(loc);
-    final List<Widget> editors = [];
-
-    for (final FieldDefinition field in widget.definition.fields) {
-      if (!field.isVisibleFor(_values)) {
-        continue;
-      }
-
-      final Widget? editor = _editor(labels, field);
-      if (editor != null) {
-        if (editors.isNotEmpty) {
-          editors.add(const SizedBox(height: 12));
-        }
-        editors.add(editor);
-      }
-    }
-
-    if (_error != null) {
-      editors.add(
-        Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Text(
-            _error!,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-        ),
-      );
-    }
-
-    return AlertDialog(
-      title: Text(
-        widget.title,
-        overflow: TextOverflow.ellipsis,
-        maxLines: 1,
-      ),
-      content: SizedBox(
-        width: 420,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: editors,
-          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-          child: Text(loc.cancel),
-        ),
-        FilledButton(
-          onPressed: _requiredFieldsFilled ? _save : null,
-          child: Text(loc.save),
-        ),
-      ],
     );
   }
 }

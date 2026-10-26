@@ -6,10 +6,12 @@ import 'package:hybrid_note/app_cubit.dart';
 import 'package:hybrid_note/l10n/generated/app_localizations.dart';
 import 'package:hybrid_note/lists/builtin_templates.dart';
 import 'package:hybrid_note/lists/generic_list_screen.dart';
-import 'package:hybrid_note/lists/generic_watch_read_screen.dart';
+import 'package:hybrid_note/lists/generic_list_host.dart';
 import 'package:hybrid_note/lists/list_definition.dart';
 import 'package:hybrid_note/lists/list_item.dart';
 import 'package:hybrid_note/lists/list_labels.dart';
+import 'package:hybrid_note/lists/list_rules.dart';
+import 'package:hybrid_note/lists/list_store.dart';
 import 'package:hybrid_note/watch_item.dart';
 
 import '../support/fakes.dart';
@@ -36,9 +38,25 @@ Widget _app(Widget child) {
   );
 }
 
-class _Recorder {
-  final List<(ListItem, bool)> saved = [];
-  final List<ListItem> deleted = [];
+// Records what the screen asks the store to do.
+class _Recorder implements ListStore {
+  final List<ListItem> saved = [];
+  final List<String> deleted = [];
+
+  @override
+  Future<void> apply(ListChanges changes) async {
+    saved.addAll(changes.saved);
+    deleted.addAll(changes.deletedIds);
+  }
+
+  @override
+  Future<void> addOption(String listId, String fieldKey, String value) async {}
+
+  @override
+  Future<void> removeOption(String listId, String fieldKey, String value) async {}
+
+  @override
+  Future<void> refresh() async {}
 }
 
 Widget _screen(List<ListItem> items, _Recorder recorder) {
@@ -46,17 +64,14 @@ Widget _screen(List<ListItem> items, _Recorder recorder) {
     GenericListScreen(
       definition: _watch,
       items: items,
-      emptyText: 'Nothing here',
-      addTooltip: 'Add item',
-      addDialogTitle: 'Add',
-      editDialogTitle: 'Edit',
-      onSave: (item, {required bool isNew}) async {
-        recorder.saved.add((item, isNew));
-      },
-      onDelete: (item) async {
-        recorder.deleted.add(item);
-      },
-      onRefresh: () async {},
+      store: recorder,
+      texts: const GenericListTexts(
+        title: 'Watch',
+        emptyText: 'Nothing here',
+        addTooltip: 'Add item',
+        addDialogTitle: 'Add',
+        editDialogTitle: 'Edit',
+      ),
     ),
   );
 }
@@ -145,8 +160,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(recorder.saved, hasLength(1));
-    final (ListItem saved, bool isNew) = recorder.saved.single;
-    expect(isNew, isTrue);
+    final ListItem saved = recorder.saved.single;
     expect(saved.values, {
       'title': 'Severance',
       'type': 'tvShow',
@@ -182,8 +196,7 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
-    final (ListItem saved, bool isNew) = recorder.saved.single;
-    expect(isNew, isFalse);
+    final ListItem saved = recorder.saved.single;
     expect(saved.id, 'b');
     expect(saved.createdAt, original.createdAt);
     expect(saved.values.containsKey('season'), isFalse);
@@ -202,7 +215,7 @@ void main() {
     await tester.tap(find.text('Delete').last);
     await tester.pumpAndSettle();
 
-    expect(recorder.deleted.single.id, 'c');
+    expect(recorder.deleted.single, 'c');
   });
 
   testWidgets('Watch/Read adapter adds through AppCubit', (tester) async {
@@ -217,7 +230,7 @@ void main() {
     await tester.pumpWidget(
       BlocProvider.value(
         value: cubit,
-        child: _app(const GenericWatchReadScreen()),
+        child: _app(const GenericListHost(listId: BuiltinTemplates.watchReadId)),
       ),
     );
 

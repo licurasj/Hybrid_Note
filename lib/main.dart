@@ -6,13 +6,10 @@ import 'app_state.dart';
 import 'app_storage.dart';
 import 'drive_sync_service.dart';
 import 'home_screen.dart';
-import 'journal_screen.dart';
-import 'todo_screen.dart';
-import 'watchlist_screen.dart';
-import 'grocery_screen.dart';
 import 'app_colors.dart';
 import 'l10n/generated/app_localizations.dart';
-import 'lists/generic_watch_read_screen.dart';
+import 'lists/builtin_templates.dart';
+import 'lists/generic_list_host.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -272,15 +269,13 @@ class _MainShellState extends State<MainShell> {
   Widget _screenForIndex(int index) {
     switch (index) {
       case 1:
-        return const TodoScreen();
+        return const GenericListHost(listId: BuiltinTemplates.tasksId);
       case 2:
-        return const GroceryScreen();
+        return const GenericListHost(listId: BuiltinTemplates.groceryId);
       case 3:
-        return const JournalScreen();
+        return const GenericListHost(listId: BuiltinTemplates.journalId);
       case 4:
-        return useGenericLists
-            ? const GenericWatchReadScreen()
-            : const WatchlistScreen();
+        return const GenericListHost(listId: BuiltinTemplates.watchReadId);
       case 0:
       default:
         return HomeScreen(onNavigate: _selectPage);

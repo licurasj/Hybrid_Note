@@ -104,7 +104,8 @@
         "groupBy": { "$ref": "#/$defs/fieldKey" },
         "dateField": { "type": "string" },
         "timelineGrouping": { "$ref": "#/$defs/timelineGrouping" },
-        "filterChipsBy": { "$ref": "#/$defs/fieldKey" }
+        "filterChipsBy": { "$ref": "#/$defs/fieldKey" },
+        "bucketBy": { "$ref": "#/$defs/fieldKey" }
       }
     },
     "behavior": {
