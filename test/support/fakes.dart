@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:hybrid_note/app_data.dart';
 import 'package:hybrid_note/app_storage.dart';
 import 'package:hybrid_note/drive_sync_service.dart';
@@ -18,14 +20,14 @@ class FakeAppStorage extends AppStorage {
     this.data = data;
   }
 
-  bool leftHanded = false;
+  Offset? hubPosition;
 
   @override
-  Future<bool> loadLeftHanded() async => leftHanded;
+  Future<Offset?> loadHubPosition() async => hubPosition;
 
   @override
-  Future<void> saveLeftHanded(bool leftHanded) async {
-    this.leftHanded = leftHanded;
+  Future<void> saveHubPosition(Offset position) async {
+    hubPosition = position;
   }
 
   @override

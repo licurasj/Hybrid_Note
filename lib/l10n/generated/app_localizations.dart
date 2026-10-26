@@ -214,18 +214,6 @@ abstract class AppLocalizations {
   /// **'Switch to light mode'**
   String get switchToLightMode;
 
-  /// No description provided for @switchToLeftHandMode.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to left-hand mode'**
-  String get switchToLeftHandMode;
-
-  /// No description provided for @switchToRightHandMode.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to right-hand mode'**
-  String get switchToRightHandMode;
-
   /// No description provided for @pendingTasks.
   ///
   /// In en, this message translates to:

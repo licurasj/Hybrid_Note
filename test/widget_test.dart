@@ -36,7 +36,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('left-hand mode moves the hub to the left and is saved', (
+  testWidgets('the hub can be moved and its position is saved', (
     WidgetTester tester,
   ) async {
     final FakeAppStorage storage = FakeAppStorage();
@@ -52,14 +52,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final double width = tester.getSize(find.byType(Scaffold).first).width;
-    double hubX() => tester.getCenter(find.byKey(const ValueKey('launcher-hub'))).dx;
-    expect(hubX(), greaterThan(width / 2));
-
-    await tester.tap(find.byTooltip('Switch to left-hand mode'));
+    final Finder hub = find.byKey(const ValueKey('launcher-hub'));
+    final TestGesture gesture = await tester.startGesture(tester.getCenter(hub));
+    for (int i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await gesture.moveTo(const Offset(120, 200));
+    await tester.pump();
+    await gesture.up();
     await tester.pumpAndSettle();
 
-    expect(hubX(), lessThan(width / 2));
-    expect(storage.leftHanded, isTrue);
+    expect(tester.getCenter(hub).dx, closeTo(120, 1));
+    expect(storage.hubPosition, isNotNull);
   });
 }

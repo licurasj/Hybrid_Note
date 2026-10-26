@@ -28,7 +28,7 @@ Future<_Log> _pump(
   WidgetTester tester, {
   int count = 4,
   bool withNew = true,
-  bool leftHanded = false,
+  Offset? hubPosition,
 }) async {
   final _Log log = _Log();
   tester.view.physicalSize = const Size(400, 800);
@@ -43,7 +43,10 @@ Future<_Log> _pump(
           onOpen: (note) => log.events.add('open ${note.id}'),
           onEdit: (note) => log.events.add('edit ${note.id}'),
           onNew: withNew ? () => log.events.add('new') : null,
-          leftHanded: leftHanded,
+          hubPosition: hubPosition,
+          onHubMoved: (position) => log.events.add(
+            'moved ${position.dx.toStringAsFixed(2)},${position.dy.toStringAsFixed(2)}',
+          ),
         ),
       ),
     ),
@@ -51,12 +54,12 @@ Future<_Log> _pump(
   return log;
 }
 
-LauncherGeometry _geometry(int count, {bool leftHanded = false}) {
+LauncherGeometry _geometry(int count, {Offset? hub}) {
   return LauncherGeometry(
     config: _config,
     size: const Size(400, 800),
     noteCount: count,
-    leftHanded: leftHanded,
+    hubPosition: hub,
   );
 }
 
@@ -82,6 +85,13 @@ void main() {
       final Offset first = _tab(geometry, 0);
       final Offset last = _tab(geometry, geometry.slotCount - 1);
       // First tab points mostly left, the last mostly up; all stay on screen.
+      // Neighbouring tabs overlap near the hub.
+      expect(
+        (geometry.pointAt(geometry.slotAngle(0), _config.innerRadius) -
+                geometry.pointAt(geometry.slotAngle(1), _config.innerRadius))
+            .distance,
+        lessThan(_config.tabThickness),
+      );
       expect(first.dx < last.dx && first.dy > last.dy, isTrue);
       for (int i = 0; i < geometry.slotCount; i++) {
         final Offset outer = geometry.pointAt(geometry.slotAngle(i.toDouble()), _config.outerRadius);
@@ -120,13 +130,39 @@ void main() {
       expect(geometry.scrollVelocity(middle), 0);
     });
 
-    test('left-hand mode mirrors everything', () {
-      final LauncherGeometry left = _geometry(12, leftHanded: true);
+    test('the fan opens away from whichever corner the hub is nearest', () {
+      final LauncherGeometry topLeft = _geometry(12, hub: const Offset(60, 80));
 
-      expect(left.hubCenter, const Offset(88, 800 - 64));
-      expect(left.addCenter.dx, lessThan(left.hubCenter.dx));
-      expect(_tab(left, 2).dx, closeTo(400 - _tab(geometry, 2).dx, 1e-9));
-      expect(left.hitTest(_tab(left, 2), 0), const LauncherTarget(LauncherTargetKind.note, 2));
+      expect(topLeft.flipX && topLeft.flipY, isTrue);
+      // "+" stays on the corner side; tabs go right and down.
+      expect(topLeft.addCenter.dx, lessThan(topLeft.hubCenter.dx));
+      expect(_tab(topLeft, 2).dx, greaterThan(topLeft.hubCenter.dx));
+      expect(_tab(topLeft, 2).dy, greaterThan(topLeft.hubCenter.dy));
+      expect(topLeft.hitTest(_tab(topLeft, 2), 0),
+          const LauncherTarget(LauncherTargetKind.note, 2));
+
+      final LauncherGeometry bottomLeft = _geometry(12, hub: const Offset(88, 736));
+      expect(_tab(bottomLeft, 2).dx, closeTo(400 - _tab(geometry, 2).dx, 1e-9));
+    });
+
+    test('a moved hub stays inside the screen margins', () {
+      final LauncherGeometry outside = _geometry(4, hub: const Offset(-50, 900));
+      expect(outside.hubCenter, const Offset(40, 760));
+    });
+
+    test('tab text is never upside down', () {
+      for (final Offset hub in const [
+        Offset(312, 736),
+        Offset(60, 80),
+        Offset(88, 736),
+        Offset(340, 90),
+      ]) {
+        final LauncherGeometry g = _geometry(5, hub: hub);
+        for (int i = 0; i < g.slotCount; i++) {
+          final double rotation = g.tabRotation(g.slotAngle(i.toDouble()));
+          expect(rotation.abs(), lessThanOrEqualTo(3.14159265 / 2 + 1e-9));
+        }
+      }
     });
 
     test('no scrolling when every tab fits', () {
@@ -231,6 +267,67 @@ void main() {
     });
   });
 
+  group('moving the hub', () {
+    testWidgets('rest on the hub, then drag: the hub moves and is reported', (tester) async {
+      final _Log log = await _pump(tester);
+      final LauncherGeometry geometry = _geometry(4);
+
+      final TestGesture gesture = await tester.startGesture(geometry.hubCenter);
+      for (int i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await gesture.moveTo(const Offset(100, 200));
+      await tester.pump();
+      expect(
+        tester.getCenter(find.byKey(const ValueKey('launcher-hub'))),
+        const Offset(100, 200),
+      );
+      // The fan is hidden while moving.
+      expect(find.text('Note 0'), findsNothing);
+      await gesture.up();
+      await tester.pump();
+
+      expect(log.events, ['moved 0.25,0.25']);
+    });
+
+    testWidgets('a saved position is used, and the fan opens away from it', (tester) async {
+      await _pump(tester, hubPosition: const Offset(0.2, 0.1));
+
+      final Offset hub = tester.getCenter(find.byKey(const ValueKey('launcher-hub')));
+      expect(hub, const Offset(80, 80));
+      await tester.tap(find.byKey(const ValueKey('launcher-hub')));
+      await tester.pump();
+      expect(tester.getCenter(find.text('Note 2')).dy, greaterThan(hub.dy));
+    });
+  });
+
+  group('overlap', () {
+    testWidgets('the tab under the finger is painted on top', (tester) async {
+      await _pump(tester);
+      final LauncherGeometry geometry = _geometry(4);
+
+      final TestGesture gesture = await tester.startGesture(geometry.hubCenter);
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.moveTo(_tab(geometry, 1));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      final Stack stack = tester.widget<Stack>(
+        find
+            .ancestor(
+              of: find.byKey(const ValueKey('launcher-tab-n0')),
+              matching: find.byType(Stack),
+            )
+            .first,
+      );
+      final List<Key?> order = stack.children.map((child) => child.key).toList();
+      final int top = order.indexOf(const ValueKey('launcher-tab-n1'));
+      for (final String other in ['n0', 'n2', 'n3']) {
+        expect(order.indexOf(ValueKey('launcher-tab-$other')), lessThan(top));
+      }
+      await gesture.up();
+    });
+  });
+
   group('tap mode', () {
     testWidgets('tap the hub, tap a note to open; long-press to edit', (tester) async {
       final _Log log = await _pump(tester);
@@ -280,6 +377,9 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('launcher-next')));
       await tester.pump();
       expect(find.text('Note 11'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('launcher-prev')));
+      await tester.pump();
+      expect(find.text('Note 11'), findsNothing);
     });
 
     testWidgets('keyboard: arrows move focus, Enter opens, E edits, Esc closes', (tester) async {

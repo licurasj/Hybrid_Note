@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -10,7 +11,7 @@ class AppStorage {
   static const String _dataFileName = 'hybrid_note_app_data.json';
   static const String _deviceFileName = 'hybrid_note_app_device.txt';
   static const String _localeFileName = 'hybrid_note_app_locale.txt';
-  static const String _handFileName = 'hybrid_note_app_hand.txt';
+  static const String _hubFileName = 'hybrid_note_app_hub.txt';
 
   // Tests pass a temporary directory; the app uses the documents folder.
   final Future<Directory> Function() _getDirectory;
@@ -100,18 +101,28 @@ class AppStorage {
     await tempFile.rename(file.path);
   }
 
-  // Left-hand mode is a per-device choice, so it is stored here rather than
-  // in the synced AppData.
-  Future<bool> loadLeftHanded() async {
+  // Where the launcher hub sits, as fractions of the screen ("x,y"). It is a
+  // per-device choice, so it is stored here rather than in the synced AppData.
+  Future<Offset?> loadHubPosition() async {
     final Directory directory = await _getDirectory();
-    final File file = File('${directory.path}/$_handFileName');
-    return await file.exists() && (await file.readAsString()).trim() == 'left';
+    final File file = File('${directory.path}/$_hubFileName');
+    if (!await file.exists()) {
+      return null;
+    }
+    final List<double?> parts = (await file.readAsString())
+        .split(',')
+        .map((part) => double.tryParse(part.trim()))
+        .toList();
+    if (parts.length != 2 || parts.contains(null)) {
+      return null;
+    }
+    return Offset(parts[0]!, parts[1]!);
   }
 
-  Future<void> saveLeftHanded(bool leftHanded) async {
+  Future<void> saveHubPosition(Offset position) async {
     final Directory directory = await _getDirectory();
-    await File('${directory.path}/$_handFileName')
-        .writeAsString(leftHanded ? 'left' : 'right');
+    await File('${directory.path}/$_hubFileName')
+        .writeAsString('${position.dx},${position.dy}');
   }
 
   Future<String?> loadPreferredLocaleCode() async {

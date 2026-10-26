@@ -18,8 +18,6 @@
   "languageFollowsDevice": "Use device language",
   "switchToDarkMode": "ダークモードに切り替え",
   "switchToLightMode": "ライトモードに切り替え",
-  "switchToLeftHandMode": "左手モードに切り替え",
-  "switchToRightHandMode": "右手モードに切り替え",
   "pendingTasks": "Pending Tasks",
   "completedTasks": "Completed Tasks",
   "journalEntries": "Journal Entries",

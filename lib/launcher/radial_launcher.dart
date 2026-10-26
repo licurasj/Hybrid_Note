@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -22,14 +24,17 @@ class LauncherNote {
 }
 
 // Radial launcher (plan section 5), with a plain look until the design pass
-// (D-3). Fill the screen with it (it sits in a Stack). The hub sits near the
-// bottom-right corner (bottom-left in left-hand mode), lists fan out from it
-// as long tabs, and "+" sits next to the hub. Layout: LauncherGeometry.
+// (D-3). Fill the screen with it (it sits in a Stack). Lists fan out from the
+// hub as long overlapping tabs, away from the nearest screen corner; "+" sits
+// next to the hub. Layout: LauncherGeometry. Gestures are listed in
+// coordination/docs/INTERACTIONS.md.
 //
 // Hold mode: press the hub, drag onto a tab and release to open; rest on a
 // tab until it fills, then release to edit; release on "+" for a new list;
 // release on the hub or off the fan to cancel. Resting at either end of the
 // fan scrolls it.
+// Moving: press and rest on the hub, then drag; the hub follows the finger
+// and `onHubMoved` reports where it was dropped.
 // Tap mode: a quick tap on the hub keeps the fan open with arrow buttons; tap
 // a tab to open, long-press to edit; tap outside, the hub or Esc to close.
 // Keys: left/right move focus, Enter opens, E edits, Esc closes.
@@ -40,8 +45,9 @@ class RadialLauncher extends StatefulWidget {
     required this.onOpen,
     required this.onEdit,
     this.onNew,
+    this.hubPosition,
+    this.onHubMoved,
     this.config = const LauncherConfig(),
-    this.leftHanded = false,
     this.hubTooltip = 'Lists',
     this.addLabel = 'New list',
     this.editLabel = 'Edit',
@@ -52,8 +58,11 @@ class RadialLauncher extends StatefulWidget {
   final ValueChanged<LauncherNote> onEdit;
   // Null shows the "+" dimmed and inactive.
   final VoidCallback? onNew;
+  // Saved hub centre as a fraction of the launcher's size; null = default.
+  final Offset? hubPosition;
+  // Receives the dropped hub centre as a fraction of the launcher's size.
+  final ValueChanged<Offset>? onHubMoved;
   final LauncherConfig config;
-  final bool leftHanded;
   final String hubTooltip;
   final String addLabel;
   final String editLabel;
@@ -62,7 +71,7 @@ class RadialLauncher extends StatefulWidget {
   State<RadialLauncher> createState() => RadialLauncherState();
 }
 
-enum _Mode { closed, hold, tap }
+enum _Mode { closed, hold, tap, moving }
 
 class RadialLauncherState extends State<RadialLauncher>
     with SingleTickerProviderStateMixin {
@@ -80,6 +89,11 @@ class RadialLauncherState extends State<RadialLauncher>
   double _dwellProgress = 0;
   bool _editArmed = false;
 
+  // Hub dragged by the user, in pixels; wins over widget.hubPosition until
+  // the parent catches up.
+  Offset? _movedHub;
+  Offset _moveGrab = Offset.zero;
+
   late final Ticker _ticker;
   Duration _now = Duration.zero;
   Duration _lastTick = Duration.zero;
@@ -94,13 +108,21 @@ class RadialLauncherState extends State<RadialLauncher>
   }
 
   @override
+  void didUpdateWidget(RadialLauncher oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.hubPosition != widget.hubPosition) {
+      _movedHub = null;
+    }
+  }
+
+  @override
   void dispose() {
     _ticker.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  bool get isOpen => _mode != _Mode.closed;
+  bool get isOpen => _mode == _Mode.hold || _mode == _Mode.tap;
 
   void _close() {
     _ticker.stop();
@@ -131,6 +153,20 @@ class RadialLauncherState extends State<RadialLauncher>
       return;
     }
 
+    // Resting on the hub picks it up.
+    if (!_leftHub &&
+        _hover == LauncherTarget.hub &&
+        widget.onHubMoved != null &&
+        _now - _restStart >= widget.config.hubMoveDelay) {
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _mode = _Mode.moving;
+        _moveGrab = geometry.hubCenter - pointer;
+        _movedHub = geometry.hubCenter;
+      });
+      return;
+    }
+
     final double velocity = geometry.scrollVelocity(pointer);
     final bool scrolling = velocity != 0 &&
         geometry.clampOffset(_scrollOffset + velocity * seconds) != _scrollOffset;
@@ -139,7 +175,7 @@ class RadialLauncherState extends State<RadialLauncher>
       if (scrolling) {
         _scrollOffset = geometry.clampOffset(_scrollOffset + velocity * seconds);
         _hover = geometry.hitTest(pointer, _scrollOffset);
-        // Notes sliding under a resting finger never start Edit.
+        // Tabs sliding under a resting finger never start Edit.
         _restartDwell(pointer);
         return;
       }
@@ -188,7 +224,21 @@ class RadialLauncherState extends State<RadialLauncher>
 
   void _onPointerMove(PointerMoveEvent event) {
     final LauncherGeometry? geometry = _geometry;
-    if (_mode != _Mode.hold || geometry == null) {
+    if (geometry == null) {
+      return;
+    }
+
+    if (_mode == _Mode.moving) {
+      setState(() {
+        _movedHub = LauncherGeometry.clampHub(
+          widget.config,
+          geometry.size,
+          event.position + _moveGrab,
+        );
+      });
+      return;
+    }
+    if (_mode != _Mode.hold) {
       return;
     }
 
@@ -208,14 +258,29 @@ class RadialLauncherState extends State<RadialLauncher>
       } else if ((event.position - (_restAnchor ?? event.position)).distance >
               widget.config.moveTolerance &&
           !_editArmed) {
-        // Moving within the same note restarts the dwell; an armed Edit
-        // stays armed until the finger leaves the note.
+        // Moving within the same tab restarts the dwell; an armed Edit stays
+        // armed until the finger leaves the tab.
         _restartDwell(event.position);
       }
     });
   }
 
   void _onPointerUp(PointerUpEvent event) {
+    if (_mode == _Mode.moving) {
+      _ticker.stop();
+      final LauncherGeometry? geometry = _geometry;
+      final Offset? dropped = _movedHub;
+      setState(() => _mode = _Mode.closed);
+      if (geometry != null && dropped != null) {
+        widget.onHubMoved?.call(
+          Offset(
+            dropped.dx / geometry.size.width,
+            dropped.dy / geometry.size.height,
+          ),
+        );
+      }
+      return;
+    }
     if (_mode != _Mode.hold) {
       return;
     }
@@ -237,7 +302,7 @@ class RadialLauncherState extends State<RadialLauncher>
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
-    if (_mode == _Mode.hold) {
+    if (_mode == _Mode.hold || _mode == _Mode.moving) {
       _close();
     }
   }
@@ -309,6 +374,14 @@ class RadialLauncherState extends State<RadialLauncher>
     return KeyEventResult.ignored;
   }
 
+  // The tab the user is on: hovered in hold mode, focused in tap mode.
+  int? get _selectedIndex {
+    if (_hover.kind == LauncherTargetKind.note) {
+      return _hover.noteIndex;
+    }
+    return _mode == _Mode.tap ? _focusIndex : null;
+  }
+
   Widget _noteWidget(
     LauncherGeometry geometry,
     LauncherNote note,
@@ -316,34 +389,42 @@ class RadialLauncherState extends State<RadialLauncher>
     double angle,
   ) {
     final LauncherConfig config = widget.config;
+    final bool selected = _selectedIndex == index;
     final bool hovered = _hover.kind == LauncherTargetKind.note &&
         _hover.noteIndex == index;
-    final bool focused = _mode == _Mode.tap && _focusIndex == index;
-    final bool lifted = hovered || focused;
+    final bool dimmed = _selectedIndex != null && !selected;
+    final bool outward = geometry.readsOutward(angle);
     final Offset center =
         geometry.pointAt(angle, config.innerRadius + config.tabLength / 2);
 
     Widget body = AnimatedScale(
-      scale: lifted ? 1.08 : 1,
-      duration: const Duration(milliseconds: 120),
-      child: Container(
+      scale: selected ? 1.06 : 1,
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOut,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
         width: config.tabLength,
         height: config.tabThickness,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: note.color,
           borderRadius: BorderRadius.circular(6),
-          border: focused ? Border.all(color: Colors.black, width: 2) : null,
-          boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
+          border: selected && _mode == _Mode.tap
+              ? Border.all(color: Colors.black, width: 2)
+              : null,
+          boxShadow: [
+            BoxShadow(
+              blurRadius: selected ? 8 : 3,
+              color: selected ? Colors.black38 : Colors.black26,
+            ),
+          ],
         ),
         child: Stack(
           children: [
             // Dwell progress fills the tab from the hub end.
             if (hovered && _dwellProgress > 0)
               Align(
-                alignment: widget.leftHanded
-                    ? Alignment.centerLeft
-                    : Alignment.centerRight,
+                alignment: outward ? Alignment.centerLeft : Alignment.centerRight,
                 child: FractionallySizedBox(
                   widthFactor: _dwellProgress,
                   heightFactor: 1,
@@ -353,10 +434,13 @@ class RadialLauncherState extends State<RadialLauncher>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
+                // Label at the outer end, where tabs no longer overlap.
+                mainAxisAlignment:
+                    outward ? MainAxisAlignment.end : MainAxisAlignment.start,
                 children: [
                   Icon(note.icon, color: Colors.white, size: 18),
                   const SizedBox(width: 6),
-                  Expanded(
+                  Flexible(
                     child: Text(
                       hovered && _editArmed ? widget.editLabel : note.label,
                       maxLines: 1,
@@ -365,6 +449,16 @@ class RadialLauncherState extends State<RadialLauncher>
                     ),
                   ),
                 ],
+              ),
+            ),
+            // The others sit slightly in shadow.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: dimmed ? 1 : 0,
+                  duration: const Duration(milliseconds: 140),
+                  child: const ColoredBox(color: Color(0x1F000000)),
+                ),
               ),
             ),
           ],
@@ -398,6 +492,7 @@ class RadialLauncherState extends State<RadialLauncher>
     }
 
     return Positioned(
+      key: ValueKey('launcher-tab-${note.id}'),
       left: center.dx - config.tabLength / 2,
       top: center.dy - config.tabThickness / 2,
       child: Transform.rotate(
@@ -405,6 +500,38 @@ class RadialLauncherState extends State<RadialLauncher>
         child: body,
       ),
     );
+  }
+
+  // Tabs ordered for painting: the selected one last (on top), the others by
+  // closeness to it, so the stack shifts as the finger moves along the fan.
+  List<Widget> _tabs(LauncherGeometry geometry) {
+    final List<(int, double)> visible = [
+      for (int index = 0; index < widget.notes.length; index++)
+        if (geometry.tabAngle(index, _scrollOffset) case final double angle)
+          (index, angle),
+    ];
+
+    double focus = _selectedIndex?.toDouble() ?? -1;
+    if (_selectedIndex == null && _pointer != null) {
+      final double? position = geometry.fanPosition(_pointer!);
+      if (position != null) {
+        focus = position * geometry.slotCount - 0.5 + _scrollOffset;
+      }
+    }
+
+    if (focus >= 0) {
+      visible.sort(
+        (a, b) => (b.$1 - focus).abs().compareTo((a.$1 - focus).abs()),
+      );
+    } else {
+      // Nothing selected: later tabs overlap earlier ones.
+      visible.sort((a, b) => a.$1.compareTo(b.$1));
+    }
+
+    return [
+      for (final (int index, double angle) in visible)
+        _noteWidget(geometry, widget.notes[index], index, angle),
+    ];
   }
 
   Widget _addWidget(Offset center) {
@@ -461,7 +588,7 @@ class RadialLauncherState extends State<RadialLauncher>
         : _scrollOffset < geometry.maxScrollOffset;
     // In the margins just past each end of the fan.
     final Offset spot = geometry.pointAt(
-      direction < 0 ? geometry.slotAngle(-0.9) : geometry.slotAngle(geometry.slotCount - 0.1),
+      geometry.slotAngle(direction < 0 ? -0.9 : geometry.slotCount - 0.1),
       widget.config.innerRadius + widget.config.tabLength / 2,
     );
     return Positioned(
@@ -480,15 +607,20 @@ class RadialLauncherState extends State<RadialLauncher>
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final Size size = constraints.biggest;
+        final Offset? saved = widget.hubPosition;
         final LauncherGeometry geometry = LauncherGeometry(
           config: widget.config,
-          size: constraints.biggest,
+          size: size,
           noteCount: widget.notes.length,
-          leftHanded: widget.leftHanded,
+          hubPosition: _movedHub ??
+              (saved == null
+                  ? null
+                  : Offset(saved.dx * size.width, saved.dy * size.height)),
         );
-        final Offset hubCenter = geometry.hubCenter;
         _geometry = geometry;
         _scrollOffset = geometry.clampOffset(_scrollOffset);
+        final Offset hubCenter = geometry.hubCenter;
         final double hub = widget.config.hubRadius;
 
         return Focus(
@@ -515,9 +647,7 @@ class RadialLauncherState extends State<RadialLauncher>
                     child: CustomPaint(painter: _RingPainter(geometry)),
                   ),
                 ),
-                for (int index = 0; index < widget.notes.length; index++)
-                  if (geometry.tabAngle(index, _scrollOffset) case final double angle)
-                    _noteWidget(geometry, widget.notes[index], index, angle),
+                ..._tabs(geometry),
                 _addWidget(geometry.addCenter),
                 if (_mode == _Mode.tap && geometry.maxScrollOffset > 0) ...[
                   _arrow(geometry, -1),
@@ -538,18 +668,31 @@ class RadialLauncherState extends State<RadialLauncher>
                     onTap: () => isOpen ? _close() : _openTapMode(),
                     child: Tooltip(
                       message: widget.hubTooltip,
-                      child: Container(
-                        key: const ValueKey('launcher-hub'),
-                        width: hub * 2,
-                        height: hub * 2,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          shape: BoxShape.circle,
-                          boxShadow: const [BoxShadow(blurRadius: 6, color: Colors.black26)],
-                        ),
-                        child: Icon(
-                          isOpen ? Icons.close : Icons.apps,
-                          color: Theme.of(context).colorScheme.onPrimary,
+                      child: AnimatedScale(
+                        scale: _mode == _Mode.moving ? 1.15 : 1,
+                        duration: const Duration(milliseconds: 120),
+                        child: Container(
+                          key: const ValueKey('launcher-hub'),
+                          width: hub * 2,
+                          height: hub * 2,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                blurRadius: _mode == _Mode.moving ? 12 : 6,
+                                color: Colors.black26,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            _mode == _Mode.moving
+                                ? Icons.open_with
+                                : isOpen
+                                    ? Icons.close
+                                    : Icons.apps,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
                         ),
                       ),
                     ),
@@ -576,8 +719,8 @@ class _RingPainter extends CustomPainter {
     final Path path = Path();
     const int steps = 48;
     for (int i = 0; i <= steps; i++) {
-      // From pointing left (bottom edge) to pointing up (side edge).
-      final double angle = 3.141592653589793 * (1 - 0.5 * i / steps);
+      // From pointing along the bottom edge to pointing along the side edge.
+      final double angle = math.pi * (1 - 0.5 * i / steps);
       final Offset point = geometry.pointAt(angle, radius);
       i == 0 ? path.moveTo(point.dx, point.dy) : path.lineTo(point.dx, point.dy);
     }
@@ -593,6 +736,6 @@ class _RingPainter extends CustomPainter {
   @override
   bool shouldRepaint(_RingPainter oldDelegate) {
     return oldDelegate.geometry.size != geometry.size ||
-        oldDelegate.geometry.leftHanded != geometry.leftHanded;
+        oldDelegate.geometry.hubCenter != geometry.hubCenter;
   }
 }

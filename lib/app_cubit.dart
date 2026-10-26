@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
@@ -41,9 +43,9 @@ class AppCubit extends Cubit<AppState> {
     );
   }
 
-  Future<void> setLeftHanded(bool leftHanded) async {
-    emit(state.copyWith(isLeftHanded: leftHanded));
-    await storage.saveLeftHanded(leftHanded);
+  Future<void> setHubPosition(Offset position) async {
+    emit(state.copyWith(hubPosition: position));
+    await storage.saveHubPosition(position);
   }
 
   void _clearSyncMessageSoon(
@@ -94,7 +96,7 @@ class AppCubit extends Cubit<AppState> {
     try {
       final AppData loadedData = await storage.loadAppData();
       final String? preferredLocaleCode = await storage.loadPreferredLocaleCode();
-      final bool leftHanded = await storage.loadLeftHanded();
+      final Offset? hubPosition = await storage.loadHubPosition();
 
       emit(
         state.copyWith(
@@ -104,7 +106,7 @@ class AppCubit extends Cubit<AppState> {
           isGoogleSignedIn: driveSyncService.isSignedIn,
           selectedLocaleCode: preferredLocaleCode,
           clearSelectedLocale: preferredLocaleCode == null,
-          isLeftHanded: leftHanded,
+          hubPosition: hubPosition,
           clearError: true,
         ),
       );
