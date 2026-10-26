@@ -504,9 +504,13 @@ class _GenericItemDialogState extends State<GenericItemDialog> {
         final List<_SubItemDraft> drafts = _subItems[field.key]!;
         return Column(
           key: key,
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: Theme.of(context).textTheme.labelLarge),
+            SizedBox(
+              width: double.infinity,
+              child: Text(label, style: Theme.of(context).textTheme.labelLarge),
+            ),
             for (final _SubItemDraft draft in drafts)
               Row(
                 key: ValueKey('sub-${draft.id}'),

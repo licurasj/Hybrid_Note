@@ -253,8 +253,11 @@ class _GenericListScreenState extends State<GenericListScreen> {
     }
 
     for (final FieldDefinition field in _definition.fields) {
+      // The section or group header already names this value.
       if (field.primary ||
           field.role == FieldRole.completion ||
+          field.key == _definition.view.sectionBy ||
+          field.key == _definition.view.groupBy ||
           !field.isVisibleFor(item.values)) {
         continue;
       }

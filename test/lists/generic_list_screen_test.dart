@@ -129,10 +129,10 @@ void main() {
     expect(planned < inProgress && inProgress < completed, isTrue);
 
     expect(
-      find.text('TV Show | In Progress | Season 2 | Episode 4 | Great'),
+      find.text('TV Show | Season 2 | Episode 4 | Great'),
       findsOneWidget,
     );
-    expect(find.text('Book | Completed'), findsOneWidget);
+    expect(find.text('Book'), findsOneWidget);
   });
 
   testWidgets('add: save needs a title; season only shows for TV shows', (
@@ -245,7 +245,7 @@ void main() {
     expect(added.title, 'Dune');
     expect(added.type, MediaType.book);
     expect(storage.data.watchItems.single.id, added.id);
-    expect(find.text('Book | Planned'), findsOneWidget);
+    expect(find.text('Book'), findsOneWidget);
 
     await cubit.close();
   });
