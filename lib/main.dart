@@ -8,8 +8,13 @@ import 'drive_sync_service.dart';
 import 'home_screen.dart';
 import 'app_colors.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'launcher/radial_launcher.dart';
 import 'lists/builtin_templates.dart';
 import 'lists/generic_list_host.dart';
+import 'lists/legacy_lists.dart';
+import 'lists/list_definition.dart';
+import 'lists/list_icons.dart';
+import 'lists/list_labels.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -258,28 +263,62 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int selectedIndex = 0;
+  // Lists in the order they were last opened, newest first, so the common
+  // case never needs scrolling (plan 5.3). Kept in memory for now.
+  final List<String> _recent = [];
 
-  void _selectPage(int index) {
+  static const List<String> _homeTargets = [
+    BuiltinTemplates.tasksId,
+    BuiltinTemplates.groceryId,
+    BuiltinTemplates.journalId,
+    BuiltinTemplates.watchReadId,
+  ];
+
+  void _openList(String listId) {
     setState(() {
-      selectedIndex = index;
+      _recent
+        ..remove(listId)
+        ..insert(0, listId);
     });
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => GenericListHost(listId: listId),
+      ),
+    );
   }
 
-  Widget _screenForIndex(int index) {
-    switch (index) {
-      case 1:
-        return const GenericListHost(listId: BuiltinTemplates.tasksId);
-      case 2:
-        return const GenericListHost(listId: BuiltinTemplates.groceryId);
-      case 3:
-        return const GenericListHost(listId: BuiltinTemplates.journalId);
-      case 4:
-        return const GenericListHost(listId: BuiltinTemplates.watchReadId);
-      case 0:
-      default:
-        return HomeScreen(onNavigate: _selectPage);
+  // Home dashboard cards use the old tab numbers: 1 tasks, 2 grocery,
+  // 3 journal, 4 watch/read.
+  void _openFromHome(int index) {
+    if (index >= 1 && index <= _homeTargets.length) {
+      _openList(_homeTargets[index - 1]);
     }
+  }
+
+  List<LauncherNote> _notes(AppLocalizations loc, AppState state) {
+    final LegacyImport lists = LegacyLists.importAppData(state.data);
+    final ListLabels labels = ListLabels(loc);
+    final List<ListDefinition> ordered = [...lists.definitions]
+      ..sort((a, b) {
+        int rank(ListDefinition definition) {
+          final int index = _recent.indexOf(definition.id);
+          return index < 0 ? _recent.length + lists.definitions.indexOf(definition) : index;
+        }
+
+        return rank(a).compareTo(rank(b));
+      });
+
+    return [
+      for (final ListDefinition definition in ordered)
+        LauncherNote(
+          id: definition.id,
+          label: labels.listName(definition),
+          icon: listIcon(definition.icon),
+          color: listColor(definition.color),
+          semanticsLabel:
+              '${labels.listName(definition)}, ${lists.items.where((item) => item.listId == definition.id).length}',
+        ),
+    ];
   }
 
   @override
@@ -299,37 +338,29 @@ class _MainShellState extends State<MainShell> {
         }
       },
       child: Scaffold(
-        body: _screenForIndex(selectedIndex),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: _selectPage,
-          destinations: [
-            NavigationDestination(
-              icon: const Icon(Icons.dashboard_outlined),
-              selectedIcon: const Icon(Icons.dashboard),
-              label: AppLocalizations.of(context).home,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.check_box_outlined),
-              selectedIcon: const Icon(Icons.check_box),
-              label: AppLocalizations.of(context).tasks,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.shopping_cart_outlined),
-              selectedIcon: const Icon(Icons.shopping_cart),
-              label: AppLocalizations.of(context).grocery,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.book_outlined),
-              selectedIcon: const Icon(Icons.book),
-              label: AppLocalizations.of(context).journal,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.movie_outlined),
-              selectedIcon: const Icon(Icons.movie),
-              label: AppLocalizations.of(context).watchRead,
-            ),
-          ],
+        body: BlocBuilder<AppCubit, AppState>(
+          builder: (context, state) {
+            final AppLocalizations loc = AppLocalizations.of(context);
+            return Stack(
+              children: [
+                // Room below the dashboard so the hub never covers it.
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 88),
+                  child: HomeScreen(onNavigate: _openFromHome),
+                ),
+                Positioned.fill(
+                  child: RadialLauncher(
+                    notes: _notes(loc, state),
+                    onOpen: (note) => _openList(note.id),
+                    // The list editor is Phase 4; until then Edit opens the list.
+                    onEdit: (note) => _openList(note.id),
+                    editLabel: loc.edit,
+                    addLabel: loc.add,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

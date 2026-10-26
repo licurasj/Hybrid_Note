@@ -24,7 +24,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(MaterialApp), findsOneWidget);
-    expect(find.text('Home'), findsWidgets);
+    expect(find.text('Pending Tasks'), findsOneWidget);
+    expect(find.byKey(const ValueKey('launcher-hub')), findsOneWidget);
+
+    // Tap mode: open the hub and pick Grocery; the list opens as a page.
+    await tester.tap(find.byKey(const ValueKey('launcher-hub')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('launcher-note-builtin.grocery')));
+    await tester.pumpAndSettle();
+    expect(find.text('Grocery List'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
