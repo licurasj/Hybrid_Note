@@ -38,6 +38,43 @@ class FieldOption {
   }
 }
 
+// Shows a field only while another enum field has one of the given values,
+// e.g. season and episode only for TV shows. Hidden fields are cleared on save.
+class FieldCondition {
+  final String field;
+  final List<String> values;
+
+  const FieldCondition({
+    required this.field,
+    required this.values,
+  });
+
+  bool isMetBy(Map<String, dynamic> itemValues) {
+    return values.contains(itemValues[field]);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'field': field,
+      'in': values,
+    };
+  }
+
+  factory FieldCondition.fromJson(Object? json) {
+    final Map<String, dynamic> map = _asMap(json, 'visibleWhen');
+    final List<dynamic> values = _requireList(map, 'in', 'visibleWhen');
+
+    if (values.any((value) => value is! String)) {
+      throw const FormatException('visibleWhen: "in" must list strings');
+    }
+
+    return FieldCondition(
+      field: _requireString(map, 'field', 'visibleWhen'),
+      values: values.cast<String>(),
+    );
+  }
+}
+
 class FieldDefinition {
   final String key;
   final FieldType type;
@@ -51,6 +88,7 @@ class FieldDefinition {
   final Object? defaultValue;
   final num? min;
   final num? max;
+  final FieldCondition? visibleWhen;
 
   const FieldDefinition({
     required this.key,
@@ -64,7 +102,12 @@ class FieldDefinition {
     this.defaultValue,
     this.min,
     this.max,
+    this.visibleWhen,
   });
+
+  bool isVisibleFor(Map<String, dynamic> itemValues) {
+    return visibleWhen == null || visibleWhen!.isMetBy(itemValues);
+  }
 
   FieldDefinition copyWith({List<FieldOption>? options}) {
     return FieldDefinition(
@@ -79,6 +122,7 @@ class FieldDefinition {
       defaultValue: defaultValue,
       min: min,
       max: max,
+      visibleWhen: visibleWhen,
     );
   }
 
@@ -100,6 +144,7 @@ class FieldDefinition {
       if (defaultValue != null) 'default': defaultValue,
       if (min != null) 'min': min,
       if (max != null) 'max': max,
+      if (visibleWhen != null) 'visibleWhen': visibleWhen!.toJson(),
     };
   }
 
@@ -124,6 +169,9 @@ class FieldDefinition {
       defaultValue: map['default'],
       min: _optionalNum(map, 'min', where),
       max: _optionalNum(map, 'max', where),
+      visibleWhen: map['visibleWhen'] == null
+          ? null
+          : FieldCondition.fromJson(map['visibleWhen']),
     );
   }
 }
@@ -444,6 +492,22 @@ class ListDefinition {
 
       if (field.min != null && field.max != null && field.min! > field.max!) {
         errors.add('$where: min is greater than max');
+      }
+
+      final FieldCondition? condition = field.visibleWhen;
+      if (condition != null) {
+        final FieldDefinition? target = this.field(condition.field);
+        if (target == null || target.type != FieldType.choice) {
+          errors.add('$where: visibleWhen must name an enum field');
+        } else if (condition.field == field.key) {
+          errors.add('$where: visibleWhen cannot name the field itself');
+        } else {
+          for (final String value in condition.values) {
+            if (!target.hasOption(value)) {
+              errors.add('$where: visibleWhen "$value" is not an option of "${target.key}"');
+            }
+          }
+        }
       }
 
       final String? roleError = _roleError(field);

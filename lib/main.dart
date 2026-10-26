@@ -12,6 +12,7 @@ import 'watchlist_screen.dart';
 import 'grocery_screen.dart';
 import 'app_colors.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'lists/generic_watch_read_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -277,7 +278,9 @@ class _MainShellState extends State<MainShell> {
       case 3:
         return const JournalScreen();
       case 4:
-        return const WatchlistScreen();
+        return useGenericLists
+            ? const GenericWatchReadScreen()
+            : const WatchlistScreen();
       case 0:
       default:
         return HomeScreen(onNavigate: _selectPage);

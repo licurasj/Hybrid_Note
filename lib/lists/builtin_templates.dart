@@ -232,12 +232,14 @@ class BuiltinTemplates {
           type: FieldType.counter,
           labelKey: 'season',
           min: 0,
+          visibleWhen: FieldCondition(field: 'type', values: ['tvShow']),
         ),
         FieldDefinition(
           key: 'episode',
           type: FieldType.counter,
           labelKey: 'episode',
           min: 0,
+          visibleWhen: FieldCondition(field: 'type', values: ['tvShow']),
         ),
         FieldDefinition(
           key: 'notes',

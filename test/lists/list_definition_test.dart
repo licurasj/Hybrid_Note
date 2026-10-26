@@ -207,6 +207,28 @@ void main() {
       );
     });
 
+    test('visibleWhen naming a value that is not an option', () {
+      expect(
+        errorsFor(
+          withField(5, {
+            'visibleWhen': {'field': 'light', 'in': ['dark']},
+          }),
+        ),
+        contains(contains('visibleWhen "dark" is not an option')),
+      );
+    });
+
+    test('visibleWhen naming a field that is not an enum', () {
+      expect(
+        errorsFor(
+          withField(5, {
+            'visibleWhen': {'field': 'name', 'in': ['x']},
+          }),
+        ),
+        contains(contains('visibleWhen must name an enum field')),
+      );
+    });
+
     test('a bad color', () {
       expect(
         errorsFor(_plantList()..['color'] = 'green'),

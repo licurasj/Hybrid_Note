@@ -82,7 +82,16 @@
         },
         "default": {},
         "min": { "type": "number" },
-        "max": { "type": "number" }
+        "max": { "type": "number" },
+        "visibleWhen": {
+          "type": "object",
+          "required": ["field", "in"],
+          "additionalProperties": false,
+          "properties": {
+            "field": { "$ref": "#/$defs/fieldKey" },
+            "in": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+          }
+        }
       }
     },
     "view": {
