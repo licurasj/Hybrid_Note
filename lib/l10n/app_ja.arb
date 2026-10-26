@@ -235,5 +235,6 @@
   "next": "次へ",
   "launcherNoteHint": "ダブルタップで開く、長押しで編集",
   "hiddenValuesWarning": "{count} 件の値は新しい種類に合わないため、非表示で保持されます",
-  "itemsCount": "{name}、{count} 件"
+  "itemsCount": "{name}、{count} 件",
+  "moveHub": "移動"
 }

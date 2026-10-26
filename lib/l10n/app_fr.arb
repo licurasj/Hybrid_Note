@@ -235,5 +235,6 @@
   "next": "Suivant",
   "launcherNoteHint": "Touchez deux fois pour ouvrir, appuyez longuement pour modifier",
   "hiddenValuesWarning": "{count} valeurs ne correspondent pas au nouveau type et seront conservées masquées",
-  "itemsCount": "{name}, {count} éléments"
+  "itemsCount": "{name}, {count} éléments",
+  "moveHub": "Déplacer"
 }

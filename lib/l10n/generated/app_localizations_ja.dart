@@ -542,4 +542,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String itemsCount(String name, int count) {
     return '$name、$count 件';
   }
+
+  @override
+  String get moveHub => '移動';
 }

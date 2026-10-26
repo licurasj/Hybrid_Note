@@ -235,5 +235,6 @@
   "next": "Weiter",
   "launcherNoteHint": "Doppeltippen zum Öffnen, lange drücken zum Bearbeiten",
   "hiddenValuesWarning": "{count} Werte passen nicht zum neuen Typ und werden ausgeblendet aufbewahrt",
-  "itemsCount": "{name}, {count} Einträge"
+  "itemsCount": "{name}, {count} Einträge",
+  "moveHub": "Verschieben"
 }

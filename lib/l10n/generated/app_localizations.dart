@@ -1131,6 +1131,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{name}, {count} items'**
   String itemsCount(String name, int count);
+
+  /// No description provided for @moveHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get moveHub;
 }
 
 class _AppLocalizationsDelegate

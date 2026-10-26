@@ -235,5 +235,6 @@
   "next": "下一页",
   "launcherNoteHint": "双击打开，长按编辑",
   "hiddenValuesWarning": "{count} 个值与新类型不符，将被隐藏保留",
-  "itemsCount": "{name}，{count} 项"
+  "itemsCount": "{name}，{count} 项",
+  "moveHub": "移动"
 }

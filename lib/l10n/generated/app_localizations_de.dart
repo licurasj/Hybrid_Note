@@ -544,4 +544,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String itemsCount(String name, int count) {
     return '$name, $count Einträge';
   }
+
+  @override
+  String get moveHub => 'Verschieben';
 }

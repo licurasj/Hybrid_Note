@@ -72,7 +72,7 @@ void main() {
     final LauncherGeometry geometry = _geometry(12);
 
     test('hub near the bottom-right corner, "+" right next to it', () {
-      expect(geometry.hubCenter, const Offset(400 - 88, 800 - 64));
+      expect(geometry.hubCenter, const Offset(400 - 88, 800 - 110));
       expect(geometry.addCenter.dy, geometry.hubCenter.dy);
       expect(geometry.addCenter.dx, greaterThan(geometry.hubCenter.dx));
       expect(geometry.addCenter.dx + _config.addRadius, lessThanOrEqualTo(400));
@@ -141,13 +141,16 @@ void main() {
       expect(topLeft.hitTest(_tab(topLeft, 2), 0),
           const LauncherTarget(LauncherTargetKind.note, 2));
 
-      final LauncherGeometry bottomLeft = _geometry(12, hub: const Offset(88, 736));
+      final LauncherGeometry bottomLeft = _geometry(12, hub: const Offset(88, 690));
       expect(_tab(bottomLeft, 2).dx, closeTo(400 - _tab(geometry, 2).dx, 1e-9));
     });
 
     test('a moved hub stays inside the screen margins', () {
       final LauncherGeometry outside = _geometry(4, hub: const Offset(-50, 900));
-      expect(outside.hubCenter, const Offset(40, 760));
+      // Room for "+" beside it and the Move prompt below it.
+      expect(outside.hubCenter, const Offset(86, 800 - 84));
+      expect(outside.addCenter.dx - _config.addRadius, greaterThanOrEqualTo(0));
+      expect(outside.movePromptCenter.dy + 18, lessThanOrEqualTo(800));
     });
 
     test('tab text is never upside down', () {
@@ -171,8 +174,28 @@ void main() {
     });
   });
 
+  // Rests the finger long enough for a prompt (promptDelay) in small steps.
+  Future<void> rest(WidgetTester tester, [int ms = 1400]) async {
+    for (int i = 0; i < ms ~/ 100; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
+
+  Future<void> moveInSteps(TestGesture gesture, WidgetTester tester, Offset from, Offset to) async {
+    for (int i = 1; i <= 6; i++) {
+      await gesture.moveTo(Offset.lerp(from, to, i / 6)!);
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+  }
+
+  Opacity promptOpacity(WidgetTester tester, String key) {
+    return tester.widget<Opacity>(
+      find.descendant(of: find.byKey(ValueKey(key)), matching: find.byType(Opacity)).first,
+    );
+  }
+
   group('hold mode', () {
-    testWidgets('drag onto a note and release opens it', (tester) async {
+    testWidgets('drag onto a tab and release opens it', (tester) async {
       final _Log log = await _pump(tester);
       final LauncherGeometry geometry = _geometry(4);
 
@@ -187,48 +210,133 @@ void main() {
       expect(find.text('Note 1'), findsNothing);
     });
 
-    testWidgets('resting on a note arms edit', (tester) async {
+    testWidgets('no Edit prompt before the hold delay; the tab label never changes', (tester) async {
+      await _pump(tester);
+      final LauncherGeometry geometry = _geometry(4);
+
+      final TestGesture gesture = await tester.startGesture(geometry.hubCenter);
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.moveTo(_tab(geometry, 2));
+      await rest(tester, 1000);
+      expect(find.byKey(const ValueKey('launcher-edit-prompt')), findsNothing);
+
+      await rest(tester, 400);
+      expect(find.byKey(const ValueKey('launcher-edit-prompt')), findsOneWidget);
+      expect(find.text('Note 2'), findsOneWidget);
+      await gesture.up();
+    });
+
+    testWidgets('the Edit prompt fades in from under the tab and is painted below it', (tester) async {
+      await _pump(tester);
+      final LauncherGeometry geometry = _geometry(4);
+
+      final TestGesture gesture = await tester.startGesture(geometry.hubCenter);
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.moveTo(_tab(geometry, 2));
+      await rest(tester, 1300);
+      final double early = promptOpacity(tester, 'launcher-edit-prompt').opacity;
+      await rest(tester, 300);
+      final double later = promptOpacity(tester, 'launcher-edit-prompt').opacity;
+      expect(early, lessThan(later));
+      expect(later, 1);
+
+      final Stack stack = tester.widget<Stack>(
+        find.ancestor(of: find.byKey(const ValueKey('launcher-tab-n2')), matching: find.byType(Stack)).first,
+      );
+      final List<Key?> order = stack.children.map((child) => child.key).toList();
+      expect(
+        order.indexOf(const ValueKey('launcher-edit-prompt')),
+        lessThan(order.indexOf(const ValueKey('launcher-tab-n2'))),
+      );
+      await gesture.up();
+    });
+
+    testWidgets('slide onto Edit and release edits; release without reaching it opens', (tester) async {
+      final _Log log = await _pump(tester);
+      final LauncherGeometry geometry = _geometry(4);
+      final Offset tab = _tab(geometry, 2);
+      final Offset edit = geometry.editPromptCenter(geometry.slotAngle(2));
+
+      TestGesture gesture = await tester.startGesture(geometry.hubCenter);
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.moveTo(tab);
+      await rest(tester);
+      await moveInSteps(gesture, tester, tab, edit);
+      await gesture.up();
+      await tester.pump();
+
+      gesture = await tester.startGesture(geometry.hubCenter);
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.moveTo(tab);
+      await rest(tester);
+      await gesture.up();
+      await tester.pump();
+
+      expect(log.events, ['edit n2', 'open n2']);
+    });
+
+    testWidgets('the prompt lights up with progress, and sliding back cancels edit', (tester) async {
+      final _Log log = await _pump(tester);
+      final LauncherGeometry geometry = _geometry(4);
+      final Offset tab = _tab(geometry, 2);
+      final Offset edit = geometry.editPromptCenter(geometry.slotAngle(2));
+
+      final TestGesture gesture = await tester.startGesture(geometry.hubCenter);
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.moveTo(tab);
+      await rest(tester);
+
+      double scale() {
+        return tester.widget<Transform>(
+          find.descendant(
+            of: find.byKey(const ValueKey('launcher-edit-prompt')),
+            matching: find.byType(Transform),
+          ).first,
+        ).transform.getMaxScaleOnAxis();
+      }
+
+      final double atStart = scale();
+      await gesture.moveTo(Offset.lerp(tab, edit, 0.5)!);
+      await tester.pump();
+      final double halfway = scale();
+      await moveInSteps(gesture, tester, Offset.lerp(tab, edit, 0.5)!, edit);
+      final double reached = scale();
+      expect(atStart < halfway && halfway < reached, isTrue);
+
+      await moveInSteps(gesture, tester, edit, tab);
+      await gesture.up();
+      await tester.pump();
+      expect(log.events, ['open n2']);
+    });
+
+    testWidgets('moving to another tab lets the prompt go', (tester) async {
       final _Log log = await _pump(tester);
       final LauncherGeometry geometry = _geometry(4);
 
       final TestGesture gesture = await tester.startGesture(geometry.hubCenter);
       await tester.pump(const Duration(milliseconds: 50));
       await gesture.moveTo(_tab(geometry, 2));
-      for (int i = 0; i < 12; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
-      expect(find.text('Edit'), findsOneWidget);
+      await rest(tester);
+      expect(find.byKey(const ValueKey('launcher-edit-prompt')), findsOneWidget);
+      await gesture.moveTo(_tab(geometry, 0));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('launcher-edit-prompt')), findsNothing);
       await gesture.up();
       await tester.pump();
 
-      expect(log.events, ['edit n2']);
+      expect(log.events, ['open n0']);
     });
 
-    testWidgets('moving more than the tolerance restarts the dwell', (tester) async {
-      final _Log log = await _pump(tester);
-      final LauncherGeometry geometry = _geometry(4);
-      final Offset note = _tab(geometry, 2);
-
-      final TestGesture gesture = await tester.startGesture(geometry.hubCenter);
-      await tester.pump(const Duration(milliseconds: 50));
-      await gesture.moveTo(note);
-      await tester.pump(const Duration(milliseconds: 700));
-      await gesture.moveTo(note + const Offset(12, 0));
-      await tester.pump(const Duration(milliseconds: 700));
-      await gesture.up();
-      await tester.pump();
-
-      expect(log.events, ['open n2']);
-    });
-
-    testWidgets('release on "+" asks for a new list; on the hub cancels', (tester) async {
+    testWidgets('"+" comes out from under the hub and lights up as the finger nears', (tester) async {
       final _Log log = await _pump(tester);
       final LauncherGeometry geometry = _geometry(4);
 
       TestGesture gesture = await tester.startGesture(geometry.hubCenter);
-      await tester.pump(const Duration(milliseconds: 50));
-      await gesture.moveTo(geometry.addCenter);
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 10));
+      final double early = promptOpacity(tester, 'launcher-add-prompt').opacity;
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(early, lessThan(promptOpacity(tester, 'launcher-add-prompt').opacity));
+      await moveInSteps(gesture, tester, geometry.hubCenter, geometry.addCenter);
       await gesture.up();
       await tester.pump();
 
@@ -244,7 +352,7 @@ void main() {
       expect(log.events, ['new']);
     });
 
-    testWidgets('resting at the right end scrolls the notes', (tester) async {
+    testWidgets('resting at the right end scrolls; the tab there then opens', (tester) async {
       final _Log log = await _pump(tester, count: 12);
       final LauncherGeometry geometry = _geometry(12);
       final Offset rightEnd = geometry.pointAt(
@@ -261,40 +369,71 @@ void main() {
       await gesture.up();
       await tester.pump();
 
-      // Scrolled to the end, so the last tab is under the finger. Once the
-      // tabs stop moving, resting there arms Edit as anywhere else.
-      expect(log.events, ['edit n11']);
+      // A prompt may have come up once scrolling stopped, but the finger
+      // never went to it, so release is a plain open.
+      expect(log.events, ['open n11']);
     });
   });
 
   group('moving the hub', () {
-    testWidgets('rest on the hub, then drag: the hub moves and is reported', (tester) async {
+    testWidgets('rest on the hub: Move comes out below; release on it, then drag the hub', (tester) async {
       final _Log log = await _pump(tester);
       final LauncherGeometry geometry = _geometry(4);
 
-      final TestGesture gesture = await tester.startGesture(geometry.hubCenter);
-      for (int i = 0; i < 8; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
+      TestGesture gesture = await tester.startGesture(geometry.hubCenter);
+      await rest(tester, 1000);
+      expect(find.byKey(const ValueKey('launcher-move-prompt')), findsNothing);
+      await rest(tester, 600);
+      expect(find.byKey(const ValueKey('launcher-move-prompt')), findsOneWidget);
+      // Below the hub, and painted underneath it.
+      expect(geometry.movePromptCenter.dy, greaterThan(geometry.hubCenter.dy));
+      await moveInSteps(gesture, tester, geometry.hubCenter, geometry.movePromptCenter);
+      await gesture.up();
+      await tester.pump();
+      expect(find.byKey(const ValueKey('launcher-move-armed')), findsOneWidget);
+
+      // The next drag moves the hub, then move mode ends by itself.
+      gesture = await tester.startGesture(geometry.hubCenter);
       await gesture.moveTo(const Offset(100, 200));
       await tester.pump();
       expect(
         tester.getCenter(find.byKey(const ValueKey('launcher-hub'))),
         const Offset(100, 200),
       );
-      // The fan is hidden while moving.
-      expect(find.text('Note 0'), findsNothing);
       await gesture.up();
       await tester.pump();
 
       expect(log.events, ['moved 0.25,0.25']);
+      expect(find.byKey(const ValueKey('launcher-move-armed')), findsNothing);
+    });
+
+    testWidgets('releasing short of the Move prompt does nothing; tapping away cancels move mode', (tester) async {
+      final _Log log = await _pump(tester);
+      final LauncherGeometry geometry = _geometry(4);
+
+      TestGesture gesture = await tester.startGesture(geometry.hubCenter);
+      await rest(tester, 1600);
+      await gesture.up();
+      await tester.pump();
+      expect(find.byKey(const ValueKey('launcher-move-armed')), findsNothing);
+
+      gesture = await tester.startGesture(geometry.hubCenter);
+      await rest(tester, 1600);
+      await moveInSteps(gesture, tester, geometry.hubCenter, geometry.movePromptCenter);
+      await gesture.up();
+      await tester.pump();
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('launcher-move-armed')), findsNothing);
+      expect(log.events, isEmpty);
     });
 
     testWidgets('a saved position is used, and the fan opens away from it', (tester) async {
       await _pump(tester, hubPosition: const Offset(0.2, 0.1));
 
       final Offset hub = tester.getCenter(find.byKey(const ValueKey('launcher-hub')));
-      expect(hub, const Offset(80, 80));
+      expect(hub, const Offset(86, 84));
       await tester.tap(find.byKey(const ValueKey('launcher-hub')));
       await tester.pump();
       expect(tester.getCenter(find.text('Note 2')).dy, greaterThan(hub.dy));

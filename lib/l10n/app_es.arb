@@ -235,5 +235,6 @@
   "next": "Siguiente",
   "launcherNoteHint": "Toca dos veces para abrir, mantén pulsado para editar",
   "hiddenValuesWarning": "{count} valores no encajan con el nuevo tipo y se guardarán ocultos",
-  "itemsCount": "{name}, {count} elementos"
+  "itemsCount": "{name}, {count} elementos",
+  "moveHub": "Mover"
 }

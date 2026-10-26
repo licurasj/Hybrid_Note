@@ -543,4 +543,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String itemsCount(String name, int count) {
     return '$name, $count items';
   }
+
+  @override
+  String get moveHub => 'Move';
 }

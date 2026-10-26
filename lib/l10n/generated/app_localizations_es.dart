@@ -544,4 +544,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String itemsCount(String name, int count) {
     return '$name, $count elementos';
   }
+
+  @override
+  String get moveHub => 'Mover';
 }

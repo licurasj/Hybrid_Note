@@ -14,26 +14,30 @@ class LauncherConfig {
   const LauncherConfig({
     this.hubRadius = 32,
     this.defaultHubInsetX = 88,
-    this.defaultHubInsetY = 64,
+    this.defaultHubInsetY = 110,
     this.screenMargin = 40,
     this.addRadius = 20,
     this.addGap = 6,
     this.edgeMarginDegrees = 20,
-    this.innerRadius = 100,
+    this.innerRadius = 56,
     this.tabLength = 170,
     this.tabThickness = 40,
     this.visibleTabs = 5,
-    this.dwell = const Duration(milliseconds: 1000),
+    this.promptDelay = const Duration(milliseconds: 1200),
+    this.revealDuration = const Duration(milliseconds: 250),
+    this.promptGap = 34,
+    this.promptHitRadius = 26,
+    this.promptSelectAt = 0.8,
+    this.promptUnselectAt = 0.6,
     this.moveTolerance = 8,
     this.endZoneFraction = 0.15,
     this.maxScrollSpeed = 4,
     this.tapMaxDuration = const Duration(milliseconds: 250),
-    this.hubMoveDelay = const Duration(milliseconds: 600),
   });
 
   final double hubRadius;
   // Where the hub starts before the user moves it, measured from the
-  // bottom-right corner.
+  // bottom-right corner. High enough that the Move prompt fits below it.
   final double defaultHubInsetX;
   final double defaultHubInsetY;
   // A moved hub stays at least this far from every screen edge.
@@ -47,8 +51,19 @@ class LauncherConfig {
   final double tabThickness;
   // Tabs shown across the fan at once; they overlap near the hub.
   final int visibleTabs;
-  // How long a finger must rest on a tab to arm Edit.
-  final Duration dwell;
+  // How long a finger must rest (on a tab, or on the hub) before the Edit or
+  // Move prompt appears (interaction law, coordination/docs/INTERACTIONS.md).
+  final Duration promptDelay;
+  // How long a prompt takes to fade and slide out from under its element.
+  final Duration revealDuration;
+  // Distance from the element's edge to the prompt's centre.
+  final double promptGap;
+  // A finger this close to a prompt's centre has reached it.
+  final double promptHitRadius;
+  // Progress at which a prompt counts as selected, and below which it lets go
+  // again (the gap avoids flicker).
+  final double promptSelectAt;
+  final double promptUnselectAt;
   // Movement (logical pixels) that still counts as resting.
   final double moveTolerance;
   // Share of the fan at each end that auto-scrolls.
@@ -57,8 +72,6 @@ class LauncherConfig {
   final double maxScrollSpeed;
   // A press released on the hub faster than this opens tap mode.
   final Duration tapMaxDuration;
-  // Resting on the hub this long picks it up to move it.
-  final Duration hubMoveDelay;
 
   double get outerRadius => innerRadius + tabLength;
 }
@@ -112,11 +125,20 @@ class LauncherGeometry {
     );
   }
 
+  // Keeps the hub far enough from every edge that "+" (beside it) and the
+  // Move prompt (below or above it) always fit on screen.
   static Offset clampHub(LauncherConfig config, Size size, Offset hub) {
-    final double margin = config.screenMargin;
+    final double marginX = math.max(
+      config.screenMargin,
+      config.hubRadius + config.addGap + 2 * config.addRadius + 8,
+    );
+    final double marginY = math.max(
+      config.screenMargin,
+      config.hubRadius + config.promptGap + 18,
+    );
     return Offset(
-      hub.dx.clamp(margin, math.max(margin, size.width - margin)).toDouble(),
-      hub.dy.clamp(margin, math.max(margin, size.height - margin)).toDouble(),
+      hub.dx.clamp(marginX, math.max(marginX, size.width - marginX)).toDouble(),
+      hub.dy.clamp(marginY, math.max(marginY, size.height - marginY)).toDouble(),
     );
   }
 
@@ -141,6 +163,26 @@ class LauncherGeometry {
         _hubFrame +
             Offset(config.hubRadius + config.addGap + config.addRadius, 0),
       );
+
+  // Edit prompt: just past the outer end of a tab, along its spoke.
+  Offset editPromptCenter(double angle) {
+    return _keepOnScreen(pointAt(angle, config.outerRadius + config.promptGap));
+  }
+
+  // Move prompt: below the hub in the corner frame (towards the near edge).
+  Offset get movePromptCenter {
+    return _keepOnScreen(
+      _flip(_hubFrame + Offset(0, config.hubRadius + config.promptGap - 8)),
+    );
+  }
+
+  Offset _keepOnScreen(Offset point) {
+    const double margin = 24;
+    return Offset(
+      point.dx.clamp(margin, math.max(margin, size.width - margin)).toDouble(),
+      point.dy.clamp(margin, math.max(margin, size.height - margin)).toDouble(),
+    );
+  }
 
   int get slotCount => math.max(1, config.visibleTabs);
 

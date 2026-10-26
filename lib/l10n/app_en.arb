@@ -252,5 +252,6 @@
         "type": "int"
       }
     }
-  }
+  },
+  "moveHub": "Move"
 }

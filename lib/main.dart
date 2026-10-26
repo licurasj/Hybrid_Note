@@ -467,6 +467,7 @@ class _MainShellState extends State<MainShell> {
                     onNew: _newList,
                     hubTooltip: loc.launcherHub,
                     editLabel: loc.edit,
+                    moveLabel: loc.moveHub,
                     addLabel: loc.newList,
                     previousLabel: loc.previous,
                     nextLabel: loc.next,

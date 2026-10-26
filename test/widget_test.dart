@@ -64,10 +64,20 @@ void main() {
     await tester.pumpAndSettle();
 
     final Finder hub = find.byKey(const ValueKey('launcher-hub'));
-    final TestGesture gesture = await tester.startGesture(tester.getCenter(hub));
-    for (int i = 0; i < 8; i++) {
+    final Offset start = tester.getCenter(hub);
+    TestGesture gesture = await tester.startGesture(start);
+    for (int i = 0; i < 16; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
+    final Offset prompt = tester.getCenter(find.byKey(const ValueKey('launcher-move-prompt')));
+    for (int i = 1; i <= 6; i++) {
+      await gesture.moveTo(Offset.lerp(start, prompt, i / 6)!);
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await gesture.up();
+    await tester.pump();
+
+    gesture = await tester.startGesture(start);
     await gesture.moveTo(const Offset(120, 200));
     await tester.pump();
     await gesture.up();

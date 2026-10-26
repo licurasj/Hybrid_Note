@@ -23,18 +23,20 @@ class LauncherNote {
   final String semanticsLabel;
 }
 
-// Radial launcher (plan section 5), with a plain look until the design pass
-// (D-3). Fill the screen with it (it sits in a Stack). Lists fan out from the
-// hub as long overlapping tabs, away from the nearest screen corner; "+" sits
-// next to the hub. Layout: LauncherGeometry. Gestures are listed in
-// coordination/docs/INTERACTIONS.md.
+// Radial launcher (plan section 5), plain look until the design pass (D-3).
+// Fill the screen with it (it sits in a Stack). Lists fan out from the hub as
+// long overlapping tabs, away from the nearest screen corner. Layout:
+// LauncherGeometry. Every secondary action follows the interaction law in
+// coordination/docs/INTERACTIONS.md: hold, a prompt fades in from underneath,
+// moving towards it lights it up, releasing on it acts.
 //
-// Hold mode: press the hub, drag onto a tab and release to open; rest on a
-// tab until it fills, then release to edit; release on "+" for a new list;
-// release on the hub or off the fan to cancel. Resting at either end of the
+// Hold mode: press the hub and drag onto a tab, release to open. Rest on a
+// tab and "Edit" comes out past its outer end; slide onto it and release to
+// edit, or release anywhere else on the way to open. "+" comes out from under
+// the hub on every press; drag onto it for a new list. Rest on the hub and
+// "Move" comes out below it; release on it to move the hub with the next drag.
+// Release on the hub or off the fan to cancel; resting near either end of the
 // fan scrolls it.
-// Moving: press and rest on the hub, then drag; the hub follows the finger
-// and `onHubMoved` reports where it was dropped.
 // Tap mode: a quick tap on the hub keeps the fan open with arrow buttons; tap
 // a tab to open, long-press to edit; tap outside, the hub or Esc to close.
 // Keys: left/right move focus, Enter opens, E edits, Esc closes.
@@ -51,6 +53,7 @@ class RadialLauncher extends StatefulWidget {
     this.hubTooltip = 'Lists',
     this.addLabel = 'New list',
     this.editLabel = 'Edit',
+    this.moveLabel = 'Move',
     this.previousLabel = 'Previous',
     this.nextLabel = 'Next',
     this.noteHint = 'Double-tap to open, long-press to edit',
@@ -64,11 +67,13 @@ class RadialLauncher extends StatefulWidget {
   // Saved hub centre as a fraction of the launcher's size; null = default.
   final Offset? hubPosition;
   // Receives the dropped hub centre as a fraction of the launcher's size.
+  // Null turns the Move prompt off.
   final ValueChanged<Offset>? onHubMoved;
   final LauncherConfig config;
   final String hubTooltip;
   final String addLabel;
   final String editLabel;
+  final String moveLabel;
   final String previousLabel;
   final String nextLabel;
   // Screen-reader hint on every tab in tap mode.
@@ -78,7 +83,28 @@ class RadialLauncher extends StatefulWidget {
   State<RadialLauncher> createState() => RadialLauncherState();
 }
 
-enum _Mode { closed, hold, tap, moving }
+enum _Mode { closed, hold, tap, moveArmed, moving }
+
+enum _PromptKind { edit, move }
+
+// A prompt that has come out from under its element during a hold.
+class _Prompt {
+  _Prompt({
+    required this.kind,
+    required this.anchor,
+    required this.shownAt,
+    this.noteIndex,
+  });
+
+  final _PromptKind kind;
+  // Where the finger was when the prompt appeared; progress is measured from
+  // here to the prompt.
+  final Offset anchor;
+  final Duration shownAt;
+  final int? noteIndex;
+  double progress = 0;
+  bool selected = false;
+}
 
 class RadialLauncherState extends State<RadialLauncher>
     with SingleTickerProviderStateMixin {
@@ -92,9 +118,10 @@ class RadialLauncherState extends State<RadialLauncher>
   Offset? _restAnchor;
   Duration _restStart = Duration.zero;
   Duration _pressStart = Duration.zero;
+  Duration _openedAt = Duration.zero;
   bool _leftHub = false;
-  double _dwellProgress = 0;
-  bool _editArmed = false;
+  _Prompt? _prompt;
+  double _addProgress = 0;
 
   // Hub dragged by the user, in pixels; wins over widget.hubPosition until
   // the parent catches up.
@@ -137,8 +164,8 @@ class RadialLauncherState extends State<RadialLauncher>
       _mode = _Mode.closed;
       _hover = LauncherTarget.none;
       _pointer = null;
-      _dwellProgress = 0;
-      _editArmed = false;
+      _prompt = null;
+      _addProgress = 0;
     });
   }
 
@@ -146,8 +173,59 @@ class RadialLauncherState extends State<RadialLauncher>
     setState(() {
       _mode = _Mode.tap;
       _focusIndex = _scrollOffset.round();
+      _openedAt = _now;
     });
     _focusNode.requestFocus();
+  }
+
+  double _reveal(Duration since) {
+    final int total = widget.config.revealDuration.inMicroseconds;
+    if (total <= 0) {
+      return 1;
+    }
+    return Curves.easeOut.transform(
+      ((_now - since).inMicroseconds / total).clamp(0, 1).toDouble(),
+    );
+  }
+
+  // How far the finger has come from `from` towards `target`, 0 to 1; 1 once
+  // it is within the prompt's hit radius.
+  double _progress(Offset finger, Offset from, Offset target) {
+    final double remaining = (finger - target).distance;
+    if (remaining <= widget.config.promptHitRadius) {
+      return 1;
+    }
+    final double total = math.max(
+      (from - target).distance - widget.config.promptHitRadius,
+      1,
+    );
+    return (1 - (remaining - widget.config.promptHitRadius) / total)
+        .clamp(0, 1)
+        .toDouble();
+  }
+
+  Offset _promptCenter(LauncherGeometry geometry, _Prompt prompt) {
+    if (prompt.kind == _PromptKind.move) {
+      return geometry.movePromptCenter;
+    }
+    final double angle = geometry.tabAngle(prompt.noteIndex!, _scrollOffset) ??
+        geometry.slotAngle(0);
+    return geometry.editPromptCenter(angle);
+  }
+
+  void _updatePrompt(LauncherGeometry geometry, Offset finger) {
+    final _Prompt? prompt = _prompt;
+    if (prompt == null) {
+      return;
+    }
+    prompt.progress = _progress(finger, prompt.anchor, _promptCenter(geometry, prompt));
+    final bool wasSelected = prompt.selected;
+    prompt.selected = wasSelected
+        ? prompt.progress >= widget.config.promptUnselectAt
+        : prompt.progress >= widget.config.promptSelectAt;
+    if (prompt.selected && !wasSelected) {
+      HapticFeedback.selectionClick();
+    }
   }
 
   void _onTick(Duration elapsed) {
@@ -160,21 +238,7 @@ class RadialLauncherState extends State<RadialLauncher>
       return;
     }
 
-    // Resting on the hub picks it up.
-    if (!_leftHub &&
-        _hover == LauncherTarget.hub &&
-        widget.onHubMoved != null &&
-        _now - _restStart >= widget.config.hubMoveDelay) {
-      HapticFeedback.mediumImpact();
-      setState(() {
-        _mode = _Mode.moving;
-        _moveGrab = geometry.hubCenter - pointer;
-        _movedHub = geometry.hubCenter;
-      });
-      return;
-    }
-
-    final double velocity = geometry.scrollVelocity(pointer);
+    final double velocity = _prompt == null ? geometry.scrollVelocity(pointer) : 0;
     final bool scrolling = velocity != 0 &&
         geometry.clampOffset(_scrollOffset + velocity * seconds) != _scrollOffset;
 
@@ -182,30 +246,29 @@ class RadialLauncherState extends State<RadialLauncher>
       if (scrolling) {
         _scrollOffset = geometry.clampOffset(_scrollOffset + velocity * seconds);
         _hover = geometry.hitTest(pointer, _scrollOffset);
-        // Tabs sliding under a resting finger never start Edit.
-        _restartDwell(pointer);
+        // Tabs sliding under a resting finger never bring up a prompt.
+        _restAnchor = pointer;
+        _restStart = _now;
         return;
       }
 
-      if (_hover.kind == LauncherTargetKind.note && !_editArmed) {
-        final Duration rested = _now - _restStart;
-        _dwellProgress = (rested.inMicroseconds /
-                widget.config.dwell.inMicroseconds)
-            .clamp(0, 1)
-            .toDouble();
-        if (_dwellProgress >= 1) {
-          _editArmed = true;
-          HapticFeedback.heavyImpact();
-        }
+      if (_prompt != null || _now - _restStart < widget.config.promptDelay) {
+        return;
+      }
+
+      if (_hover.kind == LauncherTargetKind.note) {
+        _prompt = _Prompt(
+          kind: _PromptKind.edit,
+          anchor: pointer,
+          shownAt: _now,
+          noteIndex: _hover.noteIndex,
+        );
+      } else if (_hover == LauncherTarget.hub &&
+          !_leftHub &&
+          widget.onHubMoved != null) {
+        _prompt = _Prompt(kind: _PromptKind.move, anchor: pointer, shownAt: _now);
       }
     });
-  }
-
-  void _restartDwell(Offset pointer) {
-    _restAnchor = pointer;
-    _restStart = _now;
-    _dwellProgress = 0;
-    _editArmed = false;
   }
 
   void _onPointerDown(PointerDownEvent event) {
@@ -219,13 +282,28 @@ class RadialLauncherState extends State<RadialLauncher>
     _ticker
       ..stop()
       ..start();
+
+    if (_mode == _Mode.moveArmed) {
+      final LauncherGeometry? geometry = _geometry;
+      setState(() {
+        _mode = _Mode.moving;
+        _moveGrab = (geometry?.hubCenter ?? event.position) - event.position;
+        _movedHub = geometry?.hubCenter;
+      });
+      return;
+    }
+
     setState(() {
       _mode = _Mode.hold;
       _pointer = event.position;
       _pressStart = _now;
+      _openedAt = _now;
       _leftHub = false;
+      _prompt = null;
+      _addProgress = 0;
       _hover = LauncherTarget.hub;
-      _restartDwell(event.position);
+      _restAnchor = event.position;
+      _restStart = _now;
     });
   }
 
@@ -249,25 +327,43 @@ class RadialLauncherState extends State<RadialLauncher>
       return;
     }
 
-    final LauncherTarget target = geometry.hitTest(event.position, _scrollOffset);
+    final Offset finger = event.position;
+    final LauncherTarget target = geometry.hitTest(finger, _scrollOffset);
+
     setState(() {
-      _pointer = event.position;
+      _pointer = finger;
       if (target != LauncherTarget.hub) {
         _leftHub = true;
       }
+      _addProgress = _progress(finger, geometry.hubCenter, geometry.addCenter);
+
+      final _Prompt? prompt = _prompt;
+      if (prompt != null) {
+        // Reaching another element lets the prompt go; the way to the prompt
+        // (off the tab, between tab and prompt) keeps it.
+        final bool otherTab = target.kind == LauncherTargetKind.note &&
+            (prompt.kind == _PromptKind.move || target.noteIndex != prompt.noteIndex);
+        final bool leftForAdd = target == LauncherTarget.add;
+        if (otherTab || leftForAdd) {
+          _prompt = null;
+        } else {
+          _updatePrompt(geometry, finger);
+          return;
+        }
+      }
+
       if (target != _hover) {
         _hover = target;
-        _restartDwell(event.position);
-        if (target.kind == LauncherTargetKind.note ||
-            target.kind == LauncherTargetKind.add) {
+        _restAnchor = finger;
+        _restStart = _now;
+        if (target.kind == LauncherTargetKind.note) {
           HapticFeedback.selectionClick();
         }
-      } else if ((event.position - (_restAnchor ?? event.position)).distance >
-              widget.config.moveTolerance &&
-          !_editArmed) {
-        // Moving within the same tab restarts the dwell; an armed Edit stays
-        // armed until the finger leaves the tab.
-        _restartDwell(event.position);
+      } else if ((finger - (_restAnchor ?? finger)).distance >
+          widget.config.moveTolerance) {
+        // A prompt only comes after the finger has been still for a while.
+        _restAnchor = finger;
+        _restStart = _now;
       }
     });
   }
@@ -293,10 +389,11 @@ class RadialLauncherState extends State<RadialLauncher>
     }
 
     final LauncherTarget target = _hover;
+    final _Prompt? prompt = _prompt;
     final bool quickTap = !_leftHub &&
         target == LauncherTarget.hub &&
+        prompt == null &&
         _now - _pressStart <= widget.config.tapMaxDuration;
-    final bool edit = _editArmed;
     _ticker.stop();
 
     if (quickTap) {
@@ -304,26 +401,40 @@ class RadialLauncherState extends State<RadialLauncher>
       return;
     }
 
-    _close();
-    _activate(target, edit: edit);
-  }
-
-  void _onPointerCancel(PointerCancelEvent event) {
-    if (_mode == _Mode.hold || _mode == _Mode.moving) {
+    if (prompt != null && prompt.kind == _PromptKind.move) {
+      final bool move = prompt.selected;
       _close();
+      if (move) {
+        HapticFeedback.mediumImpact();
+        setState(() => _mode = _Mode.moveArmed);
+      }
+      return;
     }
-  }
 
-  void _activate(LauncherTarget target, {required bool edit}) {
+    if (prompt != null && prompt.kind == _PromptKind.edit) {
+      final LauncherNote note = widget.notes[prompt.noteIndex!];
+      final bool edit = prompt.selected;
+      _close();
+      // Not on the prompt: a plain select, as if it had never appeared.
+      edit ? widget.onEdit(note) : widget.onOpen(note);
+      return;
+    }
+
+    _close();
     switch (target.kind) {
       case LauncherTargetKind.note:
-        final LauncherNote note = widget.notes[target.noteIndex!];
-        edit ? widget.onEdit(note) : widget.onOpen(note);
+        widget.onOpen(widget.notes[target.noteIndex!]);
       case LauncherTargetKind.add:
         widget.onNew?.call();
       case LauncherTargetKind.hub:
       case LauncherTargetKind.none:
         break;
+    }
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    if (_mode == _Mode.hold || _mode == _Mode.moving) {
+      _close();
     }
   }
 
@@ -344,11 +455,18 @@ class RadialLauncherState extends State<RadialLauncher>
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (_mode != _Mode.tap || event is KeyUpEvent) {
+    if (event is KeyUpEvent) {
+      return KeyEventResult.ignored;
+    }
+    final LogicalKeyboardKey key = event.logicalKey;
+    if (_mode == _Mode.moveArmed && key == LogicalKeyboardKey.escape) {
+      _close();
+      return KeyEventResult.handled;
+    }
+    if (_mode != _Mode.tap) {
       return KeyEventResult.ignored;
     }
     final LauncherGeometry? geometry = _geometry;
-    final LogicalKeyboardKey key = event.logicalKey;
 
     if (key == LogicalKeyboardKey.escape) {
       _close();
@@ -381,8 +499,12 @@ class RadialLauncherState extends State<RadialLauncher>
     return KeyEventResult.ignored;
   }
 
-  // The tab the user is on: hovered in hold mode, focused in tap mode.
+  // The tab the user is on: hovered or prompted in hold mode, focused in tap
+  // mode.
   int? get _selectedIndex {
+    if (_prompt?.kind == _PromptKind.edit) {
+      return _prompt!.noteIndex;
+    }
     if (_hover.kind == LauncherTargetKind.note) {
       return _hover.noteIndex;
     }
@@ -397,8 +519,6 @@ class RadialLauncherState extends State<RadialLauncher>
   ) {
     final LauncherConfig config = widget.config;
     final bool selected = _selectedIndex == index;
-    final bool hovered = _hover.kind == LauncherTargetKind.note &&
-        _hover.noteIndex == index;
     final bool dimmed = _selectedIndex != null && !selected;
     final bool outward = geometry.readsOutward(angle);
     final Offset center =
@@ -428,16 +548,6 @@ class RadialLauncherState extends State<RadialLauncher>
         ),
         child: Stack(
           children: [
-            // Dwell progress fills the tab from the hub end.
-            if (hovered && _dwellProgress > 0)
-              Align(
-                alignment: outward ? Alignment.centerLeft : Alignment.centerRight,
-                child: FractionallySizedBox(
-                  widthFactor: _dwellProgress,
-                  heightFactor: 1,
-                  child: const ColoredBox(color: Color(0x55FFFFFF)),
-                ),
-              ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
@@ -449,7 +559,7 @@ class RadialLauncherState extends State<RadialLauncher>
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
-                      hovered && _editArmed ? widget.editLabel : note.label,
+                      note.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -541,51 +651,141 @@ class RadialLauncherState extends State<RadialLauncher>
     ];
   }
 
-  Widget _addWidget(Offset center) {
-    final double size = widget.config.addRadius * 2;
-    final bool hovered = _hover == LauncherTarget.add;
-    final bool enabled = widget.onNew != null;
+  // A prompt label sliding out from `from` to `to` while fading in; dark until
+  // approached, lighter and slightly larger with `progress` (interaction law).
+  Widget _promptPill({
+    required Key key,
+    required Offset from,
+    required Offset to,
+    required double reveal,
+    required double progress,
+    required IconData icon,
+    String? label,
+    bool enabled = true,
+    VoidCallback? onTap,
+  }) {
+    const double height = 36;
+    final double width = label == null ? height : 92;
+    final Color lit = Theme.of(context).colorScheme.primary;
+    final Color color = Color.lerp(const Color(0xFF37474F), lit, progress)!;
+    final Offset center = Offset.lerp(from, to, reveal)!;
 
-    Widget body = AnimatedScale(
-      scale: hovered ? 1.15 : 1,
-      duration: const Duration(milliseconds: 120),
-      child: Opacity(
-        opacity: enabled ? 1 : 0.4,
+    Widget pill = Opacity(
+      opacity: enabled ? reveal : reveal * 0.4,
+      child: Transform.scale(
+        scale: 0.85 + 0.3 * progress,
         child: Container(
-          width: size,
-          height: size,
+          width: width,
+          height: height,
           decoration: BoxDecoration(
-            color: Colors.grey.shade700,
-            shape: BoxShape.circle,
+            color: color,
+            borderRadius: BorderRadius.circular(height / 2),
+            boxShadow: [
+              BoxShadow(blurRadius: 2 + 8 * progress, color: Colors.black26),
+            ],
           ),
-          child: const Icon(Icons.add, color: Colors.white),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: Color.lerp(Colors.white60, Colors.white, progress)),
+              if (label != null) ...[
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color.lerp(Colors.white60, Colors.white, progress),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
 
-    if (_mode == _Mode.tap) {
-      body = Semantics(
+    if (onTap != null) {
+      pill = GestureDetector(onTap: onTap, child: pill);
+    }
+
+    return Positioned(
+      key: key,
+      left: center.dx - width / 2,
+      top: center.dy - height / 2,
+      child: pill,
+    );
+  }
+
+  Widget _addWidget(LauncherGeometry geometry) {
+    final bool enabled = widget.onNew != null;
+    final Widget pill = _promptPill(
+      key: const ValueKey('launcher-add-prompt'),
+      from: geometry.hubCenter,
+      to: geometry.addCenter,
+      // Tap mode (the accessible path) shows everything at once.
+      reveal: _mode == _Mode.tap ? 1 : _reveal(_openedAt),
+      progress: _mode == _Mode.tap ? 0.5 : (enabled ? _addProgress : 0),
+      icon: Icons.add,
+      enabled: enabled,
+    );
+
+    if (_mode != _Mode.tap) {
+      return pill;
+    }
+    // In tap mode the "+" is a plain button.
+    return Positioned(
+      left: geometry.addCenter.dx - 24,
+      top: geometry.addCenter.dy - 24,
+      child: Semantics(
         button: true,
         enabled: enabled,
         label: widget.addLabel,
         excludeSemantics: true,
         child: GestureDetector(
           key: const ValueKey('launcher-add'),
+          behavior: HitTestBehavior.opaque,
           onTap: enabled
               ? () {
                   _close();
                   widget.onNew!();
                 }
               : null,
-          child: body,
+          child: const SizedBox(width: 48, height: 48),
         ),
+      ),
+    );
+  }
+
+  Widget? _promptWidget(LauncherGeometry geometry) {
+    final _Prompt? prompt = _prompt;
+    if (prompt == null) {
+      return null;
+    }
+
+    if (prompt.kind == _PromptKind.move) {
+      return _promptPill(
+        key: const ValueKey('launcher-move-prompt'),
+        from: geometry.hubCenter,
+        to: geometry.movePromptCenter,
+        reveal: _reveal(prompt.shownAt),
+        progress: prompt.progress,
+        icon: Icons.open_with,
+        label: widget.moveLabel,
       );
     }
 
-    return Positioned(
-      left: center.dx - size / 2,
-      top: center.dy - size / 2,
-      child: body,
+    final double? angle = geometry.tabAngle(prompt.noteIndex!, _scrollOffset);
+    if (angle == null) {
+      return null;
+    }
+    return _promptPill(
+      key: const ValueKey('launcher-edit-prompt'),
+      from: geometry.pointAt(angle, widget.config.outerRadius - 30),
+      to: geometry.editPromptCenter(angle),
+      reveal: _reveal(prompt.shownAt),
+      progress: prompt.progress,
+      icon: Icons.edit_outlined,
+      label: widget.editLabel,
     );
   }
 
@@ -629,38 +829,52 @@ class RadialLauncherState extends State<RadialLauncher>
         _scrollOffset = geometry.clampOffset(_scrollOffset);
         final Offset hubCenter = geometry.hubCenter;
         final double hub = widget.config.hubRadius;
+        final bool moveMode = _mode == _Mode.moveArmed || _mode == _Mode.moving;
+        final Widget? prompt = _promptWidget(geometry);
 
         return Focus(
           focusNode: _focusNode,
           onKeyEvent: _onKey,
           child: Stack(
             children: [
-              if (_mode == _Mode.tap)
+              if (_mode == _Mode.tap || _mode == _Mode.moveArmed)
                 Positioned.fill(
                   child: GestureDetector(
                     key: const ValueKey('launcher-barrier'),
                     behavior: HitTestBehavior.opaque,
                     onTap: _close,
-                    child: const ColoredBox(color: Color(0x33000000)),
+                    child: ColoredBox(
+                      color: _mode == _Mode.tap
+                          ? const Color(0x33000000)
+                          : const Color(0x14000000),
+                    ),
                   ),
                 ),
               if (_mode == _Mode.hold)
                 const Positioned.fill(
                   child: IgnorePointer(child: ColoredBox(color: Color(0x33000000))),
                 ),
+              // Prompts come out from underneath, so they are painted first.
+              if (_prompt?.kind == _PromptKind.edit && prompt != null) prompt,
               if (isOpen) ...[
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(painter: _RingPainter(geometry)),
-                  ),
-                ),
                 ..._tabs(geometry),
-                _addWidget(geometry.addCenter),
+                _addWidget(geometry),
                 if (_mode == _Mode.tap && geometry.maxScrollOffset > 0) ...[
                   _arrow(geometry, -1),
                   _arrow(geometry, 1),
                 ],
               ],
+              if (_prompt?.kind == _PromptKind.move && prompt != null) prompt,
+              if (_mode == _Mode.moveArmed)
+                _promptPill(
+                  key: const ValueKey('launcher-move-armed'),
+                  from: geometry.movePromptCenter,
+                  to: geometry.movePromptCenter,
+                  reveal: 1,
+                  progress: 1,
+                  icon: Icons.open_with,
+                  label: widget.moveLabel,
+                ),
               Positioned(
                 left: hubCenter.dx - hub,
                 top: hubCenter.dy - hub,
@@ -676,8 +890,8 @@ class RadialLauncherState extends State<RadialLauncher>
                     child: Tooltip(
                       message: widget.hubTooltip,
                       child: AnimatedScale(
-                        scale: _mode == _Mode.moving ? 1.15 : 1,
-                        duration: const Duration(milliseconds: 120),
+                        scale: moveMode ? 1.12 : 1,
+                        duration: const Duration(milliseconds: 160),
                         child: Container(
                           key: const ValueKey('launcher-hub'),
                           width: hub * 2,
@@ -685,15 +899,18 @@ class RadialLauncherState extends State<RadialLauncher>
                           decoration: BoxDecoration(
                             color: Theme.of(context).colorScheme.primary,
                             shape: BoxShape.circle,
+                            border: moveMode
+                                ? Border.all(color: Colors.white, width: 3)
+                                : null,
                             boxShadow: [
                               BoxShadow(
-                                blurRadius: _mode == _Mode.moving ? 12 : 6,
+                                blurRadius: moveMode ? 14 : 6,
                                 color: Colors.black26,
                               ),
                             ],
                           ),
                           child: Icon(
-                            _mode == _Mode.moving
+                            moveMode
                                 ? Icons.open_with
                                 : isOpen
                                     ? Icons.close
@@ -711,38 +928,5 @@ class RadialLauncherState extends State<RadialLauncher>
         );
       },
     );
-  }
-}
-
-// The circle the tabs start from, drawn across the quarter the fan sits in.
-class _RingPainter extends CustomPainter {
-  _RingPainter(this.geometry);
-
-  final LauncherGeometry geometry;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double radius = geometry.config.innerRadius - 6;
-    final Path path = Path();
-    const int steps = 48;
-    for (int i = 0; i <= steps; i++) {
-      // From pointing along the bottom edge to pointing along the side edge.
-      final double angle = math.pi * (1 - 0.5 * i / steps);
-      final Offset point = geometry.pointAt(angle, radius);
-      i == 0 ? path.moveTo(point.dx, point.dy) : path.lineTo(point.dx, point.dy);
-    }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = const Color(0xB3FFFFFF),
-    );
-  }
-
-  @override
-  bool shouldRepaint(_RingPainter oldDelegate) {
-    return oldDelegate.geometry.size != geometry.size ||
-        oldDelegate.geometry.hubCenter != geometry.hubCenter;
   }
 }
