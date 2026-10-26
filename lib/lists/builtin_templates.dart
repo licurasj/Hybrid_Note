@@ -13,6 +13,13 @@ class BuiltinTemplates {
 
   static final DateTime _created = DateTime.utc(2026, 10, 25);
 
+  static bool isBuiltin(String listId) {
+    return listId == tasksId ||
+        listId == groceryId ||
+        listId == journalId ||
+        listId == watchReadId;
+  }
+
   static List<ListDefinition> all({List<String> taskCategories = const []}) {
     return [
       tasks(categories: taskCategories),

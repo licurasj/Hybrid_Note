@@ -95,6 +95,71 @@ class ListLabels {
     return resolve(option.label, option.labelKey, option.value);
   }
 
+  String fieldType(FieldType type) {
+    switch (type) {
+      case FieldType.text:
+        return loc.typeText;
+      case FieldType.longText:
+        return loc.typeLongText;
+      case FieldType.checkbox:
+        return loc.typeCheckbox;
+      case FieldType.toggle:
+        return loc.typeToggle;
+      case FieldType.number:
+        return loc.typeNumber;
+      case FieldType.counter:
+        return loc.typeCounter;
+      case FieldType.rating:
+        return loc.typeRating;
+      case FieldType.date:
+        return loc.date;
+      case FieldType.dateTime:
+        return loc.typeDateTime;
+      case FieldType.choice:
+        return loc.typeChoice;
+      case FieldType.category:
+        return loc.category;
+      case FieldType.tags:
+        return loc.typeTags;
+      case FieldType.url:
+        return loc.typeUrl;
+      case FieldType.checklist:
+        return loc.typeChecklist;
+      case FieldType.recurrence:
+        return loc.repeat;
+    }
+  }
+
+  String viewKind(ViewKind kind) {
+    switch (kind) {
+      case ViewKind.checklist:
+        return loc.viewChecklist;
+      case ViewKind.sectioned:
+        return loc.viewSectioned;
+      case ViewKind.timeline:
+        return loc.viewTimeline;
+      case ViewKind.grouped:
+        return loc.viewGrouped;
+      case ViewKind.table:
+        return loc.viewTable;
+      case ViewKind.cards:
+        return loc.viewCards;
+    }
+  }
+
+  String behavior(BehaviorKind kind) {
+    switch (kind) {
+      case BehaviorKind.recurOnClear:
+        return loc.ruleRecurOnClear;
+      case BehaviorKind.copyOnClear:
+        return loc.ruleCopyOnClear;
+      case BehaviorKind.moveAll:
+        return loc.ruleMoveAll;
+      case BehaviorKind.clearCompleted:
+        return loc.ruleClearCompleted;
+    }
+  }
+
   String recurrence(RecurrenceFrequency frequency) {
     switch (frequency) {
       case RecurrenceFrequency.none:

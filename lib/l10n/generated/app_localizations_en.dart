@@ -369,4 +369,178 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noWatchReadItemsYet => 'No watch/read items yet.';
+
+  @override
+  String get editList => 'Edit list';
+
+  @override
+  String get newList => 'New list';
+
+  @override
+  String get untitledList => 'Untitled list';
+
+  @override
+  String get listName => 'List name';
+
+  @override
+  String get listIcon => 'Icon';
+
+  @override
+  String get listColor => 'Color';
+
+  @override
+  String get fields => 'Fields';
+
+  @override
+  String get addField => 'Add field';
+
+  @override
+  String get fieldName => 'Field name';
+
+  @override
+  String get fieldType => 'Field type';
+
+  @override
+  String get required => 'Required';
+
+  @override
+  String get options => 'Options';
+
+  @override
+  String get addOption => 'Add option';
+
+  @override
+  String get layout => 'Layout';
+
+  @override
+  String get groupBy => 'Group by';
+
+  @override
+  String get sectionBy => 'Sections by';
+
+  @override
+  String get dateField => 'Date field';
+
+  @override
+  String get splitByDate => 'Today / Tomorrow / Later by';
+
+  @override
+  String get filterBy => 'Filter chips by';
+
+  @override
+  String get none => 'None';
+
+  @override
+  String get dateCreated => 'Date created';
+
+  @override
+  String get rules => 'Rules';
+
+  @override
+  String get ruleClearCompleted => 'Clear completed items';
+
+  @override
+  String get ruleRecurOnClear => 'Repeat when cleared';
+
+  @override
+  String get ruleCopyOnClear => 'Copy when cleared';
+
+  @override
+  String get ruleMoveAll => 'Move all button';
+
+  @override
+  String get allowAi => 'AI may read this list';
+
+  @override
+  String get deleteList => 'Delete list';
+
+  @override
+  String get listDeleted => 'List deleted';
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String get builtinListNote =>
+      'Built-in lists keep their fields until sync moves to Firestore. You can change the name, icon and color.';
+
+  @override
+  String get localOnlyNote =>
+      'New lists are saved on this device only until sync moves to Firestore.';
+
+  @override
+  String get typeText => 'Text';
+
+  @override
+  String get typeLongText => 'Long text';
+
+  @override
+  String get typeCheckbox => 'Checkbox';
+
+  @override
+  String get typeToggle => 'Switch';
+
+  @override
+  String get typeNumber => 'Number';
+
+  @override
+  String get typeCounter => 'Counter';
+
+  @override
+  String get typeRating => 'Rating';
+
+  @override
+  String get typeDateTime => 'Date and time';
+
+  @override
+  String get typeChoice => 'Choice';
+
+  @override
+  String get typeTags => 'Tags';
+
+  @override
+  String get typeUrl => 'Link';
+
+  @override
+  String get typeChecklist => 'Sub-items';
+
+  @override
+  String get viewChecklist => 'Checklist';
+
+  @override
+  String get viewSectioned => 'Sections';
+
+  @override
+  String get viewTimeline => 'Timeline';
+
+  @override
+  String get viewGrouped => 'Groups';
+
+  @override
+  String get viewTable => 'Table';
+
+  @override
+  String get viewCards => 'Cards';
+
+  @override
+  String get launcherHub => 'Lists';
+
+  @override
+  String get previous => 'Previous';
+
+  @override
+  String get next => 'Next';
+
+  @override
+  String get launcherNoteHint => 'Double-tap to open, long-press to edit';
+
+  @override
+  String hiddenValuesWarning(int count) {
+    return '$count values do not fit the new type and will be kept hidden';
+  }
+
+  @override
+  String itemsCount(String name, int count) {
+    return '$name, $count items';
+  }
 }

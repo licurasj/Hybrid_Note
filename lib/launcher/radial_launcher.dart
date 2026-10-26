@@ -51,6 +51,9 @@ class RadialLauncher extends StatefulWidget {
     this.hubTooltip = 'Lists',
     this.addLabel = 'New list',
     this.editLabel = 'Edit',
+    this.previousLabel = 'Previous',
+    this.nextLabel = 'Next',
+    this.noteHint = 'Double-tap to open, long-press to edit',
   });
 
   final List<LauncherNote> notes;
@@ -66,6 +69,10 @@ class RadialLauncher extends StatefulWidget {
   final String hubTooltip;
   final String addLabel;
   final String editLabel;
+  final String previousLabel;
+  final String nextLabel;
+  // Screen-reader hint on every tab in tap mode.
+  final String noteHint;
 
   @override
   State<RadialLauncher> createState() => RadialLauncherState();
@@ -470,7 +477,7 @@ class RadialLauncherState extends State<RadialLauncher>
       body = Semantics(
         button: true,
         label: note.semanticsLabel,
-        hint: 'Double-tap to open, long-press to ${widget.editLabel.toLowerCase()}',
+        hint: widget.noteHint,
         excludeSemantics: true,
         child: GestureDetector(
           key: ValueKey('launcher-note-${note.id}'),
@@ -596,7 +603,7 @@ class RadialLauncherState extends State<RadialLauncher>
       top: spot.dy - 24,
       child: IconButton(
         key: ValueKey(direction < 0 ? 'launcher-prev' : 'launcher-next'),
-        tooltip: direction < 0 ? 'Previous' : 'Next',
+        tooltip: direction < 0 ? widget.previousLabel : widget.nextLabel,
         icon: Icon(direction < 0 ? Icons.chevron_left : Icons.chevron_right),
         onPressed: enabled ? () => _page(direction) : null,
       ),

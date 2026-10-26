@@ -369,4 +369,179 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get noWatchReadItemsYet => 'No watch/read items yet.';
+
+  @override
+  String get editList => 'Editar lista';
+
+  @override
+  String get newList => 'Nueva lista';
+
+  @override
+  String get untitledList => 'Lista sin título';
+
+  @override
+  String get listName => 'Nombre de la lista';
+
+  @override
+  String get listIcon => 'Icono';
+
+  @override
+  String get listColor => 'Color';
+
+  @override
+  String get fields => 'Campos';
+
+  @override
+  String get addField => 'Añadir campo';
+
+  @override
+  String get fieldName => 'Nombre del campo';
+
+  @override
+  String get fieldType => 'Tipo de campo';
+
+  @override
+  String get required => 'Obligatorio';
+
+  @override
+  String get options => 'Opciones';
+
+  @override
+  String get addOption => 'Añadir opción';
+
+  @override
+  String get layout => 'Diseño';
+
+  @override
+  String get groupBy => 'Agrupar por';
+
+  @override
+  String get sectionBy => 'Secciones por';
+
+  @override
+  String get dateField => 'Campo de fecha';
+
+  @override
+  String get splitByDate => 'Hoy / Mañana / Más tarde por';
+
+  @override
+  String get filterBy => 'Filtrar por';
+
+  @override
+  String get none => 'Ninguno';
+
+  @override
+  String get dateCreated => 'Fecha de creación';
+
+  @override
+  String get rules => 'Reglas';
+
+  @override
+  String get ruleClearCompleted => 'Borrar completados';
+
+  @override
+  String get ruleRecurOnClear => 'Repetir al borrar';
+
+  @override
+  String get ruleCopyOnClear => 'Copiar al borrar';
+
+  @override
+  String get ruleMoveAll => 'Botón mover todo';
+
+  @override
+  String get allowAi => 'La IA puede leer esta lista';
+
+  @override
+  String get deleteList => 'Eliminar lista';
+
+  @override
+  String get listDeleted => 'Lista eliminada';
+
+  @override
+  String get undo => 'Deshacer';
+
+  @override
+  String get builtinListNote =>
+      'Las listas integradas conservan sus campos hasta el paso a Firestore. Puedes cambiar el nombre, el icono y el color.';
+
+  @override
+  String get localOnlyNote =>
+      'Las listas nuevas se guardan solo en este dispositivo hasta el paso a Firestore.';
+
+  @override
+  String get typeText => 'Texto';
+
+  @override
+  String get typeLongText => 'Texto largo';
+
+  @override
+  String get typeCheckbox => 'Casilla';
+
+  @override
+  String get typeToggle => 'Interruptor';
+
+  @override
+  String get typeNumber => 'Número';
+
+  @override
+  String get typeCounter => 'Contador';
+
+  @override
+  String get typeRating => 'Valoración';
+
+  @override
+  String get typeDateTime => 'Fecha y hora';
+
+  @override
+  String get typeChoice => 'Opción';
+
+  @override
+  String get typeTags => 'Etiquetas';
+
+  @override
+  String get typeUrl => 'Enlace';
+
+  @override
+  String get typeChecklist => 'Subelementos';
+
+  @override
+  String get viewChecklist => 'Lista de control';
+
+  @override
+  String get viewSectioned => 'Secciones';
+
+  @override
+  String get viewTimeline => 'Cronología';
+
+  @override
+  String get viewGrouped => 'Grupos';
+
+  @override
+  String get viewTable => 'Tabla';
+
+  @override
+  String get viewCards => 'Tarjetas';
+
+  @override
+  String get launcherHub => 'Listas';
+
+  @override
+  String get previous => 'Anterior';
+
+  @override
+  String get next => 'Siguiente';
+
+  @override
+  String get launcherNoteHint =>
+      'Toca dos veces para abrir, mantén pulsado para editar';
+
+  @override
+  String hiddenValuesWarning(int count) {
+    return '$count valores no encajan con el nuevo tipo y se guardarán ocultos';
+  }
+
+  @override
+  String itemsCount(String name, int count) {
+    return '$name, $count elementos';
+  }
 }

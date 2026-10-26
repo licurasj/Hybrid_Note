@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hybrid_note/app_cubit.dart';
+import 'package:hybrid_note/lists/custom_lists.dart';
 import 'package:hybrid_note/main.dart';
 
 import 'support/fakes.dart';
@@ -12,12 +13,17 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
-      BlocProvider(
-        create: (_) => AppCubit(
-          storage: FakeAppStorage(),
-          driveSyncService: FakeDriveSyncService(),
-          deviceId: 'test-device',
-        )..loadData(),
+      MultiBlocProvider(
+        providers: [
+          BlocProvider(
+            create: (_) => AppCubit(
+              storage: FakeAppStorage(),
+              driveSyncService: FakeDriveSyncService(),
+              deviceId: 'test-device',
+            )..loadData(),
+          ),
+          BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())),
+        ],
         child: const HybridNoteApp(),
       ),
     );
@@ -41,12 +47,17 @@ void main() {
   ) async {
     final FakeAppStorage storage = FakeAppStorage();
     await tester.pumpWidget(
-      BlocProvider(
-        create: (_) => AppCubit(
-          storage: storage,
-          driveSyncService: FakeDriveSyncService(),
-          deviceId: 'test-device',
-        )..loadData(),
+      MultiBlocProvider(
+        providers: [
+          BlocProvider(
+            create: (_) => AppCubit(
+              storage: storage,
+              driveSyncService: FakeDriveSyncService(),
+              deviceId: 'test-device',
+            )..loadData(),
+          ),
+          BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())),
+        ],
         child: const HybridNoteApp(),
       ),
     );

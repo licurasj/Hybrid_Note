@@ -4,14 +4,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../app_cubit.dart';
 import '../app_state.dart';
 import '../l10n/generated/app_localizations.dart';
-import 'app_cubit_list_store.dart';
 import 'builtin_templates.dart';
+import 'custom_lists.dart';
 import 'generic_list_screen.dart';
-import 'legacy_lists.dart';
+import 'list_catalog.dart';
 import 'list_definition.dart';
 import 'list_labels.dart';
 
-// One built-in list on the generic screen, fed from today's AppCubit state.
+// One list on the generic screen, built-in or the user's own.
 class GenericListHost extends StatelessWidget {
   const GenericListHost({super.key, required this.listId});
 
@@ -22,10 +22,11 @@ class GenericListHost extends StatelessWidget {
     AppLocalizations loc,
     ListDefinition definition,
   ) {
+    final String name = ListLabels(loc).listName(definition);
     switch (listId) {
       case BuiltinTemplates.tasksId:
         return GenericListTexts(
-          title: loc.tasks,
+          title: name,
           emptyText: loc.noTasksHereYet,
           addTooltip: loc.addTaskTooltip,
           addDialogTitle: loc.addTask,
@@ -33,7 +34,7 @@ class GenericListHost extends StatelessWidget {
         );
       case BuiltinTemplates.groceryId:
         return GenericListTexts(
-          title: loc.groceryList,
+          title: definition.name ?? loc.groceryList,
           emptyText: loc.noGroceriesCurrent,
           addTooltip: loc.addGroceryItemTooltip,
           addDialogTitle: loc.addGroceryItem,
@@ -41,7 +42,7 @@ class GenericListHost extends StatelessWidget {
         );
       case BuiltinTemplates.journalId:
         return GenericListTexts(
-          title: loc.journal,
+          title: name,
           emptyText: loc.noJournalEntriesYet,
           addTooltip: loc.addJournalEntryTooltip,
           addDialogTitle: loc.addJournalEntry,
@@ -49,7 +50,7 @@ class GenericListHost extends StatelessWidget {
         );
       case BuiltinTemplates.watchReadId:
         return GenericListTexts(
-          title: loc.watchReadList,
+          title: definition.name ?? loc.watchReadList,
           emptyText: loc.noWatchReadItemsYet,
           addTooltip: loc.addWatchReadItemTooltip,
           addDialogTitle: loc.addWatchReadItem,
@@ -57,7 +58,6 @@ class GenericListHost extends StatelessWidget {
         );
     }
 
-    final String name = ListLabels(loc).listName(definition);
     return GenericListTexts(
       title: name,
       emptyText: '—',
@@ -70,19 +70,29 @@ class GenericListHost extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppLocalizations loc = AppLocalizations.of(context);
-    final AppCubitListStore store = AppCubitListStore(context.read<AppCubit>());
+    final RoutingListStore store = RoutingListStore(
+      context.read<AppCubit>(),
+      context.read<CustomListsCubit>(),
+    );
 
-    return BlocBuilder<AppCubit, AppState>(
-      builder: (context, state) {
-        final LegacyImport lists = LegacyLists.importAppData(state.data);
-        final ListDefinition definition =
-            lists.definitions.firstWhere((definition) => definition.id == listId);
+    return BlocBuilder<CustomListsCubit, CustomListsData>(
+      builder: (context, custom) {
+        return BlocBuilder<AppCubit, AppState>(
+          builder: (context, state) {
+            final ListCatalog catalog = ListCatalog.from(state, custom);
+            final ListDefinition? definition = catalog.definition(listId);
+            if (definition == null) {
+              // The list was deleted while open.
+              return Scaffold(appBar: AppBar());
+            }
 
-        return GenericListScreen(
-          definition: definition,
-          items: lists.items.where((item) => item.listId == listId).toList(),
-          store: store,
-          texts: textsFor(listId, loc, definition),
+            return GenericListScreen(
+              definition: definition,
+              items: catalog.itemsOf(listId),
+              store: store,
+              texts: textsFor(listId, loc, definition),
+            );
+          },
         );
       },
     );

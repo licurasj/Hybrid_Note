@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:hybrid_note/app_data.dart';
 import 'package:hybrid_note/app_storage.dart';
 import 'package:hybrid_note/drive_sync_service.dart';
+import 'package:hybrid_note/lists/custom_lists.dart';
 
 // In-memory storage so the test never touches path_provider or the disk.
 class FakeAppStorage extends AppStorage {
@@ -46,4 +47,19 @@ class FakeDriveSyncService extends DriveSyncService {
 
   @override
   Future<bool> tryRestorePreviousSignIn() async => false;
+}
+
+// In-memory storage for the user's own lists.
+class FakeCustomListsStorage extends CustomListsStorage {
+  CustomListsData data = const CustomListsData();
+  int saves = 0;
+
+  @override
+  Future<CustomListsData> load() async => data;
+
+  @override
+  Future<void> save(CustomListsData data) async {
+    this.data = data;
+    saves++;
+  }
 }

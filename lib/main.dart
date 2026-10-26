@@ -11,10 +11,13 @@ import 'l10n/generated/app_localizations.dart';
 import 'launcher/radial_launcher.dart';
 import 'lists/builtin_templates.dart';
 import 'lists/generic_list_host.dart';
-import 'lists/legacy_lists.dart';
+import 'lists/custom_lists.dart';
+import 'lists/list_catalog.dart';
 import 'lists/list_definition.dart';
+import 'lists/list_editor_screen.dart';
 import 'lists/list_icons.dart';
 import 'lists/list_labels.dart';
+import 'lists/list_patch.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,12 +26,19 @@ Future<void> main() async {
   final String deviceId = await storage.getOrCreateDeviceId();
 
   runApp(
-    BlocProvider(
-      create: (_) => AppCubit(
-        storage: storage,
-        driveSyncService: DriveSyncService(),
-        deviceId: deviceId,
-      )..loadData(),
+    MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => AppCubit(
+            storage: storage,
+            driveSyncService: DriveSyncService(),
+            deviceId: deviceId,
+          )..loadData(),
+        ),
+        BlocProvider(
+          create: (_) => CustomListsCubit(CustomListsStorage())..load(),
+        ),
+      ],
       child: const HybridNoteApp(),
     ),
   );
@@ -295,14 +305,15 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  List<LauncherNote> _notes(AppLocalizations loc, AppState state) {
-    final LegacyImport lists = LegacyLists.importAppData(state.data);
+  List<LauncherNote> _notes(AppLocalizations loc, ListCatalog catalog) {
     final ListLabels labels = ListLabels(loc);
-    final List<ListDefinition> ordered = [...lists.definitions]
+    final List<ListDefinition> ordered = [...catalog.definitions]
       ..sort((a, b) {
         int rank(ListDefinition definition) {
           final int index = _recent.indexOf(definition.id);
-          return index < 0 ? _recent.length + lists.definitions.indexOf(definition) : index;
+          return index < 0
+              ? _recent.length + catalog.definitions.indexOf(definition)
+              : index;
         }
 
         return rank(a).compareTo(rank(b));
@@ -315,10 +326,104 @@ class _MainShellState extends State<MainShell> {
           label: labels.listName(definition),
           icon: listIcon(definition.icon),
           color: listColor(definition.color),
-          semanticsLabel:
-              '${labels.listName(definition)}, ${lists.items.where((item) => item.listId == definition.id).length}',
+          semanticsLabel: loc.itemsCount(
+            labels.listName(definition),
+            catalog.itemsOf(definition.id).length,
+          ),
         ),
     ];
+  }
+
+  ListCatalog _catalog() {
+    return ListCatalog.from(
+      context.read<AppCubit>().state,
+      context.read<CustomListsCubit>().state,
+    );
+  }
+
+  Future<void> _newList() async {
+    final AppLocalizations loc = AppLocalizations.of(context);
+    final ListEditorOutcome? outcome = await Navigator.of(context).push(
+      MaterialPageRoute<ListEditorOutcome>(
+        builder: (_) => ListEditorScreen(
+          definition: blankListDefinition(loc),
+          isNew: true,
+        ),
+      ),
+    );
+    final ListPatchResult? result = outcome?.result;
+    if (!mounted || result == null || !result.isValid) {
+      return;
+    }
+
+    await context.read<CustomListsCubit>().createList(result.definition);
+    if (mounted) {
+      _openList(result.definition.id);
+    }
+  }
+
+  Future<void> _editList(String listId) async {
+    final ListCatalog catalog = _catalog();
+    final ListDefinition? definition = catalog.definition(listId);
+    if (definition == null) {
+      return;
+    }
+
+    final ListEditorOutcome? outcome = await Navigator.of(context).push(
+      MaterialPageRoute<ListEditorOutcome>(
+        builder: (_) => ListEditorScreen(
+          definition: definition,
+          items: catalog.itemsOf(listId),
+        ),
+      ),
+    );
+    if (!mounted || outcome == null) {
+      return;
+    }
+
+    final CustomListsCubit custom = context.read<CustomListsCubit>();
+    if (outcome.deleted) {
+      await _deleteList(listId);
+      return;
+    }
+
+    // Re-apply the ops to the current items, in case they changed meanwhile.
+    final ListCatalog fresh = _catalog();
+    final ListDefinition? current = fresh.definition(listId);
+    if (current == null) {
+      return;
+    }
+    final ListPatchResult result = ListPatch.apply(
+      current,
+      fresh.itemsOf(listId),
+      outcome.ops,
+      DateTime.now().toUtc(),
+    );
+    if (result.isValid) {
+      await custom.savePatched(result, outcome.ops);
+    }
+  }
+
+  // Deleting is immediate, with Undo in a snackbar and no trash bin (D-5).
+  Future<void> _deleteList(String listId) async {
+    final AppLocalizations loc = AppLocalizations.of(context);
+    final CustomListsCubit custom = context.read<CustomListsCubit>();
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final DeletedList? deleted = await custom.deleteList(listId);
+    if (deleted == null) {
+      return;
+    }
+
+    setState(() => _recent.remove(listId));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(loc.listDeleted),
+        action: SnackBarAction(
+          label: loc.undo,
+          onPressed: () => custom.restoreList(deleted),
+        ),
+      ),
+    );
   }
 
   @override
@@ -338,9 +443,11 @@ class _MainShellState extends State<MainShell> {
         }
       },
       child: Scaffold(
-        body: BlocBuilder<AppCubit, AppState>(
+        body: BlocBuilder<CustomListsCubit, CustomListsData>(
+          builder: (context, custom) => BlocBuilder<AppCubit, AppState>(
           builder: (context, state) {
             final AppLocalizations loc = AppLocalizations.of(context);
+            final ListCatalog catalog = ListCatalog.from(state, custom);
             return Stack(
               children: [
                 // Room below the dashboard so the hub never covers it.
@@ -350,12 +457,16 @@ class _MainShellState extends State<MainShell> {
                 ),
                 Positioned.fill(
                   child: RadialLauncher(
-                    notes: _notes(loc, state),
+                    notes: _notes(loc, catalog),
                     onOpen: (note) => _openList(note.id),
-                    // The list editor is Phase 4; until then Edit opens the list.
-                    onEdit: (note) => _openList(note.id),
+                    onEdit: (note) => _editList(note.id),
+                    onNew: _newList,
+                    hubTooltip: loc.launcherHub,
                     editLabel: loc.edit,
-                    addLabel: loc.add,
+                    addLabel: loc.newList,
+                    previousLabel: loc.previous,
+                    nextLabel: loc.next,
+                    noteHint: loc.launcherNoteHint,
                     hubPosition: state.hubPosition,
                     onHubMoved: context.read<AppCubit>().setHubPosition,
                   ),
@@ -363,6 +474,7 @@ class _MainShellState extends State<MainShell> {
               ],
             );
           },
+          ),
         ),
       ),
     );

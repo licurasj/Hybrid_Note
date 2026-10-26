@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hybrid_note/app_cubit.dart';
 import 'package:hybrid_note/l10n/generated/app_localizations.dart';
 import 'package:hybrid_note/lists/builtin_templates.dart';
+import 'package:hybrid_note/lists/custom_lists.dart';
 import 'package:hybrid_note/lists/generic_list_screen.dart';
 import 'package:hybrid_note/lists/generic_list_host.dart';
 import 'package:hybrid_note/lists/list_definition.dart';
@@ -228,8 +229,11 @@ void main() {
     await cubit.loadData();
 
     await tester.pumpWidget(
-      BlocProvider.value(
-        value: cubit,
+      MultiBlocProvider(
+        providers: [
+          BlocProvider.value(value: cubit),
+          BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())),
+        ],
         child: _app(const GenericListHost(listId: BuiltinTemplates.watchReadId)),
       ),
     );
