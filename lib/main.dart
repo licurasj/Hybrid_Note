@@ -418,6 +418,10 @@ class _MainShellState extends State<MainShell> {
     messenger.showSnackBar(
       SnackBar(
         content: Text(loc.listDeleted),
+        // A snackbar with an action stays until dismissed unless told
+        // otherwise; Undo is only offered for a short while.
+        persist: false,
+        duration: const Duration(seconds: 6),
         action: SnackBarAction(
           label: loc.undo,
           onPressed: () => custom.restoreList(deleted),

@@ -135,6 +135,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(custom.state.definitions.single.id, 'list-plants');
     expect(custom.state.items.single.id, 'cactus');
+
+    // The Undo offer times out by itself, so it never blocks the hub.
+    await _openLauncher(tester);
+    await tester.longPress(find.byKey(const ValueKey('launcher-note-list-plants')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('delete-list')));
+    await tester.pumpAndSettle();
+    expect(find.text('List deleted'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 7));
+    await tester.pumpAndSettle();
+    expect(find.text('List deleted'), findsNothing);
   });
 
   testWidgets('built-in lists: name and colour change, fields stay', (tester) async {
