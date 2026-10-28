@@ -16,15 +16,6 @@ class BuiltinTemplates {
 
   static final DateTime _created = DateTime.utc(2026, 10, 25);
 
-  // Still used by the local storage and FirestoreListStore's built-in
-  // rules, which T-17 removes; delete this once nothing calls it.
-  static bool isBuiltin(String listId) {
-    return listId == tasksId ||
-        listId == groceryId ||
-        listId == journalId ||
-        listId == watchReadId;
-  }
-
   static List<ListDefinition> all({List<String> taskCategories = const []}) {
     return [
       tasks(categories: taskCategories),
