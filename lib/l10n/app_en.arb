@@ -253,5 +253,412 @@
       }
     }
   },
-  "moveHub": "Move"
+  "moveHub": "Move",
+  "errorFormatTooNew": "This list comes from a newer version of the app (format {version}).",
+  "@errorFormatTooNew": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "errorEmptyId": "The list has no ID.",
+  "errorMissingName": "The list needs a name.",
+  "errorBadColor": "The color must look like #RRGGBB.",
+  "errorNoFields": "The list needs at least one field.",
+  "errorPrimaryCount": "Exactly one field must be the main field.",
+  "errorPrimaryNotText": "The main field must be a text field.",
+  "errorDuplicateRole": "Only one field can have the role {role}.",
+  "@errorDuplicateRole": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "errorBadFieldKey": "Field key \"{field}\" must start with a letter and use only letters, digits or _.",
+  "@errorBadFieldKey": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorReservedFieldKey": "Field key \"{field}\" is reserved.",
+  "@errorReservedFieldKey": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorDuplicateFieldKey": "Two fields use the key \"{field}\".",
+  "@errorDuplicateFieldKey": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorMissingFieldLabel": "Field \"{field}\" needs a name.",
+  "@errorMissingFieldLabel": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorMissingOptions": "Field \"{field}\" needs at least one option.",
+  "@errorMissingOptions": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorOptionsNotAllowed": "Field \"{field}\": {type} fields cannot have options.",
+  "@errorOptionsNotAllowed": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "errorDuplicateOption": "Field \"{field}\": the option \"{option}\" appears twice.",
+  "@errorDuplicateOption": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "option": {
+        "type": "String"
+      }
+    }
+  },
+  "errorDefaultNotOption": "Field \"{field}\": the default value is not one of the options.",
+  "@errorDefaultNotOption": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorMinAboveMax": "Field \"{field}\": the minimum is greater than the maximum.",
+  "@errorMinAboveMax": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorConditionNotChoice": "Field \"{field}\" can only depend on a choice field.",
+  "@errorConditionNotChoice": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorConditionOnItself": "Field \"{field}\" cannot depend on itself.",
+  "@errorConditionOnItself": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorConditionNotOption": "Field \"{field}\": \"{value}\" is not an option of \"{target}\".",
+  "@errorConditionNotOption": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "errorRoleNeedsType": "Field \"{field}\": the role {role} needs the type {type}.",
+  "@errorRoleNeedsType": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "role": {
+        "type": "String"
+      },
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "errorViewNeedsParam": "The {view} layout needs a field for \"{param}\".",
+  "@errorViewNeedsParam": {
+    "placeholders": {
+      "view": {
+        "type": "String"
+      },
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "errorViewParamNotField": "\"{param}\": \"{field}\" is not a field of this list.",
+  "@errorViewParamNotField": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      },
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorViewParamWrongType": "\"{param}\": \"{field}\" must be of type {types}.",
+  "@errorViewParamWrongType": {
+    "placeholders": {
+      "param": {
+        "type": "String"
+      },
+      "field": {
+        "type": "String"
+      },
+      "types": {
+        "type": "String"
+      }
+    }
+  },
+  "errorChecklistNeedsCompletion": "The checklist layout needs a field that marks items as done.",
+  "errorRuleNeedsCompletion": "Rule \"{rule}\" needs a field that marks items as done.",
+  "@errorRuleNeedsCompletion": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      }
+    }
+  },
+  "errorRuleNeedsParam": "Rule \"{rule}\": \"{param}\" is missing.",
+  "@errorRuleNeedsParam": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      },
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "errorRuleParamNotField": "Rule \"{rule}\", \"{param}\": \"{field}\" is not a field of this list.",
+  "@errorRuleParamNotField": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      },
+      "param": {
+        "type": "String"
+      },
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorRuleParamWrongType": "Rule \"{rule}\", \"{param}\": \"{field}\" must be of type {types}.",
+  "@errorRuleParamWrongType": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      },
+      "param": {
+        "type": "String"
+      },
+      "field": {
+        "type": "String"
+      },
+      "types": {
+        "type": "String"
+      }
+    }
+  },
+  "errorRuleUnknownField": "Rule \"{rule}\", \"{param}\": there is no field \"{field}\".",
+  "@errorRuleUnknownField": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      },
+      "param": {
+        "type": "String"
+      },
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorRuleValueNotOption": "Rule \"{rule}\", \"{param}\": \"{value}\" is not an option of \"{field}\".",
+  "@errorRuleValueNotOption": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      },
+      "param": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      },
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorRuleParamNotOption": "Rule \"{rule}\": \"{param}\" must be an option of \"{field}\".",
+  "@errorRuleParamNotOption": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      },
+      "param": {
+        "type": "String"
+      },
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorWrongList": "This item belongs to another list.",
+  "errorFieldRequired": "\"{field}\" is required.",
+  "@errorFieldRequired": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorWrongValueType": "\"{field}\": the value does not fit the type {type}.",
+  "@errorWrongValueType": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "errorValueEmpty": "\"{field}\" must not be empty.",
+  "@errorValueEmpty": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorBelowMin": "\"{field}\" must be at least {min}.",
+  "@errorBelowMin": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "min": {
+        "type": "String"
+      }
+    }
+  },
+  "errorAboveMax": "\"{field}\" must be at most {max}.",
+  "@errorAboveMax": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "errorNotAnOption": "\"{field}\": \"{value}\" is not one of the options.",
+  "@errorNotAnOption": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "errorBadSubItem": "\"{field}\": each sub-item needs a title and a done mark.",
+  "@errorBadSubItem": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorUnknownFrequency": "\"{field}\": unknown repeat \"{value}\".",
+  "@errorUnknownFrequency": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "errorCustomDaysMissing": "\"{field}\": a custom repeat needs a number of days above 0.",
+  "@errorCustomDaysMissing": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorOpNoField": "There is no field \"{field}\".",
+  "@errorOpNoField": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorFieldExists": "A field with the key \"{field}\" already exists.",
+  "@errorFieldExists": {
+    "placeholders": {
+      "field": {
+        "type": "String"
+      }
+    }
+  },
+  "errorUnknownFieldType": "Unknown field type \"{type}\".",
+  "@errorUnknownFieldType": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "errorBadOp": "A change could not be read: {detail}",
+  "@errorBadOp": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "errorListExists": "A list with this ID already exists.",
+  "errorDuplicateItemId": "Two items have the same ID.",
+  "errorItemIdTaken": "An item's ID is already used by another list.",
+  "errorItemInOtherList": "An item belongs to another list.",
+  "errorBuiltinOnlyInfo": "Built-in lists can only change their name, icon, color and AI setting.",
+  "addRule": "Add rule",
+  "ruleKind": "Rule",
+  "ruleRepeatField": "Repeat field",
+  "ruleMoveField": "Field",
+  "ruleMoveFrom": "Move from",
+  "ruleMoveTo": "Move to"
 }

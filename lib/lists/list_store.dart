@@ -1,5 +1,6 @@
 import 'list_catalog.dart';
 import 'list_definition.dart';
+import 'list_error.dart';
 import 'list_item.dart';
 import 'list_patch.dart';
 import 'list_rules.dart';
@@ -50,9 +51,10 @@ abstract interface class ListStore {
   Future<void> refresh();
 
   // List writes. createList validates the definition and items (including
-  // unique item ids) and returns the errors; empty means the list was
-  // created, otherwise nothing changed.
-  Future<List<String>> createList(
+  // unique item ids) and returns the errors (Q-14 A: codes the screens
+  // translate, English in toString()); empty means the list was created,
+  // otherwise nothing changed.
+  Future<List<ListError>> createList(
     ListDefinition definition, {
     List<ListItem> items = const [],
   });

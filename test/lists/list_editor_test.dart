@@ -8,7 +8,7 @@ import 'package:hybrid_note/lists/list_definition.dart';
 import 'package:hybrid_note/lists/list_item.dart';
 import 'package:hybrid_note/lists/list_rules.dart';
 import 'package:hybrid_note/lists/local_list_store.dart';
-import 'package:hybrid_note/main.dart';
+import 'package:hybrid_note/app/hybrid_note_app.dart';
 
 import '../support/fakes.dart';
 

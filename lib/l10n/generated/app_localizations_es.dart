@@ -547,4 +547,264 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get moveHub => 'Mover';
+
+  @override
+  String errorFormatTooNew(String version) {
+    return 'Esta lista viene de una versión más reciente de la app (formato $version).';
+  }
+
+  @override
+  String get errorEmptyId => 'La lista no tiene ID.';
+
+  @override
+  String get errorMissingName => 'La lista necesita un nombre.';
+
+  @override
+  String get errorBadColor => 'El color debe tener la forma #RRGGBB.';
+
+  @override
+  String get errorNoFields => 'La lista necesita al menos un campo.';
+
+  @override
+  String get errorPrimaryCount =>
+      'Exactamente un campo debe ser el campo principal.';
+
+  @override
+  String get errorPrimaryNotText => 'El campo principal debe ser de texto.';
+
+  @override
+  String errorDuplicateRole(String role) {
+    return 'Solo un campo puede tener el rol $role.';
+  }
+
+  @override
+  String errorBadFieldKey(String field) {
+    return 'La clave de campo «$field» debe empezar por una letra y usar solo letras, dígitos o _.';
+  }
+
+  @override
+  String errorReservedFieldKey(String field) {
+    return 'La clave de campo «$field» está reservada.';
+  }
+
+  @override
+  String errorDuplicateFieldKey(String field) {
+    return 'Dos campos usan la clave «$field».';
+  }
+
+  @override
+  String errorMissingFieldLabel(String field) {
+    return 'El campo «$field» necesita un nombre.';
+  }
+
+  @override
+  String errorMissingOptions(String field) {
+    return 'El campo «$field» necesita al menos una opción.';
+  }
+
+  @override
+  String errorOptionsNotAllowed(String field, String type) {
+    return 'Campo «$field»: los campos de tipo $type no pueden tener opciones.';
+  }
+
+  @override
+  String errorDuplicateOption(String field, String option) {
+    return 'Campo «$field»: la opción «$option» aparece dos veces.';
+  }
+
+  @override
+  String errorDefaultNotOption(String field) {
+    return 'Campo «$field»: el valor predeterminado no es una de las opciones.';
+  }
+
+  @override
+  String errorMinAboveMax(String field) {
+    return 'Campo «$field»: el mínimo es mayor que el máximo.';
+  }
+
+  @override
+  String errorConditionNotChoice(String field) {
+    return 'El campo «$field» solo puede depender de un campo de opción.';
+  }
+
+  @override
+  String errorConditionOnItself(String field) {
+    return 'El campo «$field» no puede depender de sí mismo.';
+  }
+
+  @override
+  String errorConditionNotOption(String field, String value, String target) {
+    return 'Campo «$field»: «$value» no es una opción de «$target».';
+  }
+
+  @override
+  String errorRoleNeedsType(String field, String role, String type) {
+    return 'Campo «$field»: el rol $role necesita el tipo $type.';
+  }
+
+  @override
+  String errorViewNeedsParam(String view, String param) {
+    return 'El diseño $view necesita un campo para «$param».';
+  }
+
+  @override
+  String errorViewParamNotField(String param, String field) {
+    return '«$param»: «$field» no es un campo de esta lista.';
+  }
+
+  @override
+  String errorViewParamWrongType(String param, String field, String types) {
+    return '«$param»: «$field» debe ser de tipo $types.';
+  }
+
+  @override
+  String get errorChecklistNeedsCompletion =>
+      'El diseño de lista de control necesita un campo que marque los elementos como hechos.';
+
+  @override
+  String errorRuleNeedsCompletion(String rule) {
+    return 'La regla «$rule» necesita un campo que marque los elementos como hechos.';
+  }
+
+  @override
+  String errorRuleNeedsParam(String rule, String param) {
+    return 'Regla «$rule»: falta «$param».';
+  }
+
+  @override
+  String errorRuleParamNotField(String rule, String param, String field) {
+    return 'Regla «$rule», «$param»: «$field» no es un campo de esta lista.';
+  }
+
+  @override
+  String errorRuleParamWrongType(
+    String rule,
+    String param,
+    String field,
+    String types,
+  ) {
+    return 'Regla «$rule», «$param»: «$field» debe ser de tipo $types.';
+  }
+
+  @override
+  String errorRuleUnknownField(String rule, String param, String field) {
+    return 'Regla «$rule», «$param»: no existe el campo «$field».';
+  }
+
+  @override
+  String errorRuleValueNotOption(
+    String rule,
+    String param,
+    String value,
+    String field,
+  ) {
+    return 'Regla «$rule», «$param»: «$value» no es una opción de «$field».';
+  }
+
+  @override
+  String errorRuleParamNotOption(String rule, String param, String field) {
+    return 'Regla «$rule»: «$param» debe ser una opción de «$field».';
+  }
+
+  @override
+  String get errorWrongList => 'Este elemento pertenece a otra lista.';
+
+  @override
+  String errorFieldRequired(String field) {
+    return '«$field» es obligatorio.';
+  }
+
+  @override
+  String errorWrongValueType(String field, String type) {
+    return '«$field»: el valor no corresponde al tipo $type.';
+  }
+
+  @override
+  String errorValueEmpty(String field) {
+    return '«$field» no puede estar vacío.';
+  }
+
+  @override
+  String errorBelowMin(String field, String min) {
+    return '«$field» debe ser al menos $min.';
+  }
+
+  @override
+  String errorAboveMax(String field, String max) {
+    return '«$field» debe ser como máximo $max.';
+  }
+
+  @override
+  String errorNotAnOption(String field, String value) {
+    return '«$field»: «$value» no es una de las opciones.';
+  }
+
+  @override
+  String errorBadSubItem(String field) {
+    return '«$field»: cada subelemento necesita un título y una marca de hecho.';
+  }
+
+  @override
+  String errorUnknownFrequency(String field, String value) {
+    return '«$field»: repetición desconocida «$value».';
+  }
+
+  @override
+  String errorCustomDaysMissing(String field) {
+    return '«$field»: una repetición personalizada necesita un número de días mayor que 0.';
+  }
+
+  @override
+  String errorOpNoField(String field) {
+    return 'No existe el campo «$field».';
+  }
+
+  @override
+  String errorFieldExists(String field) {
+    return 'Ya existe un campo con la clave «$field».';
+  }
+
+  @override
+  String errorUnknownFieldType(String type) {
+    return 'Tipo de campo desconocido «$type».';
+  }
+
+  @override
+  String errorBadOp(String detail) {
+    return 'No se pudo leer un cambio: $detail';
+  }
+
+  @override
+  String get errorListExists => 'Ya existe una lista con este ID.';
+
+  @override
+  String get errorDuplicateItemId => 'Dos elementos tienen el mismo ID.';
+
+  @override
+  String get errorItemIdTaken => 'El ID de un elemento ya lo usa otra lista.';
+
+  @override
+  String get errorItemInOtherList => 'Un elemento pertenece a otra lista.';
+
+  @override
+  String get errorBuiltinOnlyInfo =>
+      'En las listas integradas solo se pueden cambiar el nombre, el icono, el color y el ajuste de IA.';
+
+  @override
+  String get addRule => 'Añadir regla';
+
+  @override
+  String get ruleKind => 'Regla';
+
+  @override
+  String get ruleRepeatField => 'Campo de repetición';
+
+  @override
+  String get ruleMoveField => 'Campo';
+
+  @override
+  String get ruleMoveFrom => 'Mover de';
+
+  @override
+  String get ruleMoveTo => 'Mover a';
 }

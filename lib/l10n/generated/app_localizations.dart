@@ -1137,6 +1137,358 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Move'**
   String get moveHub;
+
+  /// No description provided for @errorFormatTooNew.
+  ///
+  /// In en, this message translates to:
+  /// **'This list comes from a newer version of the app (format {version}).'**
+  String errorFormatTooNew(String version);
+
+  /// No description provided for @errorEmptyId.
+  ///
+  /// In en, this message translates to:
+  /// **'The list has no ID.'**
+  String get errorEmptyId;
+
+  /// No description provided for @errorMissingName.
+  ///
+  /// In en, this message translates to:
+  /// **'The list needs a name.'**
+  String get errorMissingName;
+
+  /// No description provided for @errorBadColor.
+  ///
+  /// In en, this message translates to:
+  /// **'The color must look like #RRGGBB.'**
+  String get errorBadColor;
+
+  /// No description provided for @errorNoFields.
+  ///
+  /// In en, this message translates to:
+  /// **'The list needs at least one field.'**
+  String get errorNoFields;
+
+  /// No description provided for @errorPrimaryCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Exactly one field must be the main field.'**
+  String get errorPrimaryCount;
+
+  /// No description provided for @errorPrimaryNotText.
+  ///
+  /// In en, this message translates to:
+  /// **'The main field must be a text field.'**
+  String get errorPrimaryNotText;
+
+  /// No description provided for @errorDuplicateRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Only one field can have the role {role}.'**
+  String errorDuplicateRole(String role);
+
+  /// No description provided for @errorBadFieldKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Field key \"{field}\" must start with a letter and use only letters, digits or _.'**
+  String errorBadFieldKey(String field);
+
+  /// No description provided for @errorReservedFieldKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Field key \"{field}\" is reserved.'**
+  String errorReservedFieldKey(String field);
+
+  /// No description provided for @errorDuplicateFieldKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Two fields use the key \"{field}\".'**
+  String errorDuplicateFieldKey(String field);
+
+  /// No description provided for @errorMissingFieldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Field \"{field}\" needs a name.'**
+  String errorMissingFieldLabel(String field);
+
+  /// No description provided for @errorMissingOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Field \"{field}\" needs at least one option.'**
+  String errorMissingOptions(String field);
+
+  /// No description provided for @errorOptionsNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Field \"{field}\": {type} fields cannot have options.'**
+  String errorOptionsNotAllowed(String field, String type);
+
+  /// No description provided for @errorDuplicateOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Field \"{field}\": the option \"{option}\" appears twice.'**
+  String errorDuplicateOption(String field, String option);
+
+  /// No description provided for @errorDefaultNotOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Field \"{field}\": the default value is not one of the options.'**
+  String errorDefaultNotOption(String field);
+
+  /// No description provided for @errorMinAboveMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Field \"{field}\": the minimum is greater than the maximum.'**
+  String errorMinAboveMax(String field);
+
+  /// No description provided for @errorConditionNotChoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Field \"{field}\" can only depend on a choice field.'**
+  String errorConditionNotChoice(String field);
+
+  /// No description provided for @errorConditionOnItself.
+  ///
+  /// In en, this message translates to:
+  /// **'Field \"{field}\" cannot depend on itself.'**
+  String errorConditionOnItself(String field);
+
+  /// No description provided for @errorConditionNotOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Field \"{field}\": \"{value}\" is not an option of \"{target}\".'**
+  String errorConditionNotOption(String field, String value, String target);
+
+  /// No description provided for @errorRoleNeedsType.
+  ///
+  /// In en, this message translates to:
+  /// **'Field \"{field}\": the role {role} needs the type {type}.'**
+  String errorRoleNeedsType(String field, String role, String type);
+
+  /// No description provided for @errorViewNeedsParam.
+  ///
+  /// In en, this message translates to:
+  /// **'The {view} layout needs a field for \"{param}\".'**
+  String errorViewNeedsParam(String view, String param);
+
+  /// No description provided for @errorViewParamNotField.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{param}\": \"{field}\" is not a field of this list.'**
+  String errorViewParamNotField(String param, String field);
+
+  /// No description provided for @errorViewParamWrongType.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{param}\": \"{field}\" must be of type {types}.'**
+  String errorViewParamWrongType(String param, String field, String types);
+
+  /// No description provided for @errorChecklistNeedsCompletion.
+  ///
+  /// In en, this message translates to:
+  /// **'The checklist layout needs a field that marks items as done.'**
+  String get errorChecklistNeedsCompletion;
+
+  /// No description provided for @errorRuleNeedsCompletion.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule \"{rule}\" needs a field that marks items as done.'**
+  String errorRuleNeedsCompletion(String rule);
+
+  /// No description provided for @errorRuleNeedsParam.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule \"{rule}\": \"{param}\" is missing.'**
+  String errorRuleNeedsParam(String rule, String param);
+
+  /// No description provided for @errorRuleParamNotField.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule \"{rule}\", \"{param}\": \"{field}\" is not a field of this list.'**
+  String errorRuleParamNotField(String rule, String param, String field);
+
+  /// No description provided for @errorRuleParamWrongType.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule \"{rule}\", \"{param}\": \"{field}\" must be of type {types}.'**
+  String errorRuleParamWrongType(
+    String rule,
+    String param,
+    String field,
+    String types,
+  );
+
+  /// No description provided for @errorRuleUnknownField.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule \"{rule}\", \"{param}\": there is no field \"{field}\".'**
+  String errorRuleUnknownField(String rule, String param, String field);
+
+  /// No description provided for @errorRuleValueNotOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule \"{rule}\", \"{param}\": \"{value}\" is not an option of \"{field}\".'**
+  String errorRuleValueNotOption(
+    String rule,
+    String param,
+    String value,
+    String field,
+  );
+
+  /// No description provided for @errorRuleParamNotOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule \"{rule}\": \"{param}\" must be an option of \"{field}\".'**
+  String errorRuleParamNotOption(String rule, String param, String field);
+
+  /// No description provided for @errorWrongList.
+  ///
+  /// In en, this message translates to:
+  /// **'This item belongs to another list.'**
+  String get errorWrongList;
+
+  /// No description provided for @errorFieldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{field}\" is required.'**
+  String errorFieldRequired(String field);
+
+  /// No description provided for @errorWrongValueType.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{field}\": the value does not fit the type {type}.'**
+  String errorWrongValueType(String field, String type);
+
+  /// No description provided for @errorValueEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{field}\" must not be empty.'**
+  String errorValueEmpty(String field);
+
+  /// No description provided for @errorBelowMin.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{field}\" must be at least {min}.'**
+  String errorBelowMin(String field, String min);
+
+  /// No description provided for @errorAboveMax.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{field}\" must be at most {max}.'**
+  String errorAboveMax(String field, String max);
+
+  /// No description provided for @errorNotAnOption.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{field}\": \"{value}\" is not one of the options.'**
+  String errorNotAnOption(String field, String value);
+
+  /// No description provided for @errorBadSubItem.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{field}\": each sub-item needs a title and a done mark.'**
+  String errorBadSubItem(String field);
+
+  /// No description provided for @errorUnknownFrequency.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{field}\": unknown repeat \"{value}\".'**
+  String errorUnknownFrequency(String field, String value);
+
+  /// No description provided for @errorCustomDaysMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{field}\": a custom repeat needs a number of days above 0.'**
+  String errorCustomDaysMissing(String field);
+
+  /// No description provided for @errorOpNoField.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no field \"{field}\".'**
+  String errorOpNoField(String field);
+
+  /// No description provided for @errorFieldExists.
+  ///
+  /// In en, this message translates to:
+  /// **'A field with the key \"{field}\" already exists.'**
+  String errorFieldExists(String field);
+
+  /// No description provided for @errorUnknownFieldType.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown field type \"{type}\".'**
+  String errorUnknownFieldType(String type);
+
+  /// No description provided for @errorBadOp.
+  ///
+  /// In en, this message translates to:
+  /// **'A change could not be read: {detail}'**
+  String errorBadOp(String detail);
+
+  /// No description provided for @errorListExists.
+  ///
+  /// In en, this message translates to:
+  /// **'A list with this ID already exists.'**
+  String get errorListExists;
+
+  /// No description provided for @errorDuplicateItemId.
+  ///
+  /// In en, this message translates to:
+  /// **'Two items have the same ID.'**
+  String get errorDuplicateItemId;
+
+  /// No description provided for @errorItemIdTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'An item\'s ID is already used by another list.'**
+  String get errorItemIdTaken;
+
+  /// No description provided for @errorItemInOtherList.
+  ///
+  /// In en, this message translates to:
+  /// **'An item belongs to another list.'**
+  String get errorItemInOtherList;
+
+  /// No description provided for @errorBuiltinOnlyInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in lists can only change their name, icon, color and AI setting.'**
+  String get errorBuiltinOnlyInfo;
+
+  /// No description provided for @addRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Add rule'**
+  String get addRule;
+
+  /// No description provided for @ruleKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule'**
+  String get ruleKind;
+
+  /// No description provided for @ruleRepeatField.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat field'**
+  String get ruleRepeatField;
+
+  /// No description provided for @ruleMoveField.
+  ///
+  /// In en, this message translates to:
+  /// **'Field'**
+  String get ruleMoveField;
+
+  /// No description provided for @ruleMoveFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Move from'**
+  String get ruleMoveFrom;
+
+  /// No description provided for @ruleMoveTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to'**
+  String get ruleMoveTo;
 }
 
 class _AppLocalizationsDelegate
