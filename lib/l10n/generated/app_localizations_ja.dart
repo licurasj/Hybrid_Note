@@ -802,4 +802,19 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get ruleMoveTo => '移動先';
+
+  @override
+  String get account => 'アカウント';
+
+  @override
+  String get blankList => '空白';
+
+  @override
+  String get signInFailed => 'サインインに失敗しました。もう一度お試しください。';
+
+  @override
+  String get signInOffline => '接続がありません。サインインするにはインターネットに接続してください。';
+
+  @override
+  String get signOutFailed => 'サインアウトに失敗しました。もう一度お試しください。';
 }

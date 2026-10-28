@@ -806,4 +806,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ruleMoveTo => 'Move to';
+
+  @override
+  String get account => 'Account';
+
+  @override
+  String get blankList => 'Blank';
+
+  @override
+  String get signInFailed => 'Sign-in failed. Please try again.';
+
+  @override
+  String get signInOffline =>
+      'No connection. Connect to the internet to sign in.';
+
+  @override
+  String get signOutFailed => 'Sign-out failed. Please try again.';
 }

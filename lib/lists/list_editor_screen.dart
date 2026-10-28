@@ -569,7 +569,11 @@ class _ListEditorScreenState extends State<ListEditorScreen> {
         children: [
           TextFormField(
             key: const ValueKey('list-name'),
-            initialValue: widget.isNew
+            // A blank new list starts without a name; a template copy shows
+            // the template's.
+            initialValue:
+                (widget.definition.name ?? '').isEmpty &&
+                    widget.definition.nameKey == null
                 ? ''
                 : labels.listName(widget.definition),
             autofocus: widget.isNew,

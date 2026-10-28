@@ -1,73 +1,190 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hybrid_note/app_cubit.dart';
-import 'package:hybrid_note/lists/custom_lists.dart';
-import 'package:hybrid_note/lists/local_list_store.dart';
-import 'package:hybrid_note/app/hybrid_note_app.dart';
+import 'package:hybrid_note/app/app_settings.dart';
+import 'package:hybrid_note/backend/auth_service.dart';
+import 'package:hybrid_note/backend/firestore_list_store.dart';
+import 'package:hybrid_note/lists/builtin_templates.dart';
+import 'package:hybrid_note/lists/list_definition.dart';
 
-import 'support/fakes.dart';
+import 'support/fake_auth.dart';
+import 'support/firestore_store.dart';
+
+// The app on [auth]; whoever signs in gets [store] (the starter lists).
+Future<FirestoreListStore> _pumpApp(
+  WidgetTester tester,
+  FakeAuthService auth, {
+  Map<String, Object> preferences = const {},
+}) async {
+  tester.view.physicalSize = const Size(800, 1600);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  SharedPreferences.setMockInitialValues(preferences);
+
+  final FirestoreListStore store = await widgetTestStore(tester);
+  await tester.pumpWidget(await testApp(auth: auth, openStore: (_) => store));
+  await settle(tester);
+  return store;
+}
+
+final Finder _hub = find.byKey(const ValueKey('launcher-hub'));
 
 void main() {
-  testWidgets('HybridNoteApp starts on the home screen', (
+  testWidgets('signed in, the app starts on the home screen with the lists', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(
-      MultiBlocProvider(
-        providers: [
-          BlocProvider(
-            create: (_) => AppCubit(
-              storage: FakeAppStorage(),
-              driveSyncService: FakeDriveSyncService(),
-              deviceId: 'test-device',
-            )..loadData(),
-          ),
-          BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())..load()),
-          LocalListStore.provider(),
-        ],
-        child: const HybridNoteApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _pumpApp(tester, FakeAuthService(user: testUser));
 
     expect(find.byType(MaterialApp), findsOneWidget);
-    expect(find.text('Pending Tasks'), findsOneWidget);
-    expect(find.byKey(const ValueKey('launcher-hub')), findsOneWidget);
+    expect(find.byKey(const ValueKey('sign-in')), findsNothing);
+    expect(find.text('owner@example.com'), findsOneWidget);
+    expect(_hub, findsOneWidget);
 
     // Tap mode: open the hub and pick Grocery; the list opens as a page.
-    await tester.tap(find.byKey(const ValueKey('launcher-hub')));
+    await tester.tap(_hub);
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('launcher-note-builtin.grocery')));
-    await tester.pumpAndSettle();
-    expect(find.text('Grocery List'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('launcher-note-${BuiltinTemplates.groceryId}')),
+    );
+    await settle(tester);
+    expect(find.text('Grocery List'), findsWidgets);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('signed out shows only the sign-in screen; sign in and out', (
+    WidgetTester tester,
+  ) async {
+    final FakeAuthService auth = FakeAuthService();
+    await _pumpApp(tester, auth);
+
+    expect(find.text('Hybrid Note App'), findsOneWidget);
+    expect(find.byKey(const ValueKey('sign-in')), findsOneWidget);
+    expect(_hub, findsNothing);
+    expect(find.text('Grocery'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('sign-in')));
+    await settle(tester);
+    expect(find.byKey(const ValueKey('sign-in')), findsNothing);
+    expect(_hub, findsOneWidget);
+    expect(find.text('Grocery'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('sign-out')));
+    await settle(tester);
+    expect(auth.calls, ['signIn', 'signOut']);
+    expect(find.byKey(const ValueKey('sign-in')), findsOneWidget);
+    expect(_hub, findsNothing);
+    expect(find.text('Grocery List'), findsNothing);
+    expect(find.text('owner@example.com'), findsNothing);
+  });
+
+  testWidgets('a sign-in failure shows a message and stays signed out', (
+    WidgetTester tester,
+  ) async {
+    final FakeAuthService auth = FakeAuthService()
+      ..signInError = const AuthException(AuthFailure.network);
+    await _pumpApp(tester, auth);
+
+    await tester.tap(find.byKey(const ValueKey('sign-in')));
+    await settle(tester);
+    expect(
+      find.text('No connection. Connect to the internet to sign in.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('sign-in')), findsOneWidget);
+    expect(_hub, findsNothing);
+  });
+
+  testWidgets('an anonymous user reaches the lists the same way (D-13)', (
+    WidgetTester tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      FakeAuthService(user: const AuthUser(uid: testUid, isAnonymous: true)),
+    );
+
+    expect(find.byKey(const ValueKey('sign-in')), findsNothing);
+    expect(_hub, findsOneWidget);
+    expect(find.text('Grocery'), findsOneWidget);
+  });
+
+  testWidgets('settings come from this device: dark mode and language', (
+    WidgetTester tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      FakeAuthService(user: testUser),
+      preferences: {
+        AppSettingsCubit.darkModeKey: true,
+        AppSettingsCubit.localeKey: 'de',
+      },
+    );
+
+    final MaterialApp app = tester.widget(find.byType(MaterialApp));
+    expect(app.themeMode, ThemeMode.dark);
+    expect(app.locale, const Locale('de'));
+  });
+
+  testWidgets('"New list" offers Blank and the four templates', (
+    WidgetTester tester,
+  ) async {
+    final FirestoreListStore store = await _pumpApp(
+      tester,
+      FakeAuthService(user: testUser),
+    );
+
+    Future<void> openPicker() async {
+      await tester.tap(_hub);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('launcher-add')));
+      await tester.pumpAndSettle();
+    }
+
+    await openPicker();
+    expect(find.byKey(const ValueKey('template-blank')), findsOneWidget);
+    for (final ListDefinition template in BuiltinTemplates.all()) {
+      expect(find.byKey(ValueKey('template-${template.id}')), findsOneWidget);
+    }
+
+    // Each template opens the editor on a fresh copy, saved as a new list.
+    for (final ListDefinition template in BuiltinTemplates.all()) {
+      final int before = store.current.definitions.length;
+      if (find.byKey(const ValueKey('template-blank')).evaluate().isEmpty) {
+        await openPicker();
+      }
+      await tester.tap(find.byKey(ValueKey('template-${template.id}')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('save-list')));
+      await settle(tester);
+
+      expect(store.current.definitions, hasLength(before + 1));
+      final ListDefinition created = store.current.definitions.last;
+      expect(created.id, isNot(template.id));
+      expect(created.templateId, template.id);
+      expect(created.fields.map((f) => f.key), template.fields.map((f) => f.key));
+      // The new list opens; go back to the shell.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+    }
+
+    // Blank needs a name before it can be saved.
+    await openPicker();
+    await tester.tap(find.byKey(const ValueKey('template-blank')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('list-name')), 'Plants');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('save-list')));
+    await settle(tester);
+    expect(store.current.definitions.last.name, 'Plants');
+    expect(store.current.definitions.last.templateId, isNull);
   });
 
   testWidgets('the hub can be moved and its position is saved', (
     WidgetTester tester,
   ) async {
-    final FakeAppStorage storage = FakeAppStorage();
-    await tester.pumpWidget(
-      MultiBlocProvider(
-        providers: [
-          BlocProvider(
-            create: (_) => AppCubit(
-              storage: storage,
-              driveSyncService: FakeDriveSyncService(),
-              deviceId: 'test-device',
-            )..loadData(),
-          ),
-          BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())..load()),
-          LocalListStore.provider(),
-        ],
-        child: const HybridNoteApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _pumpApp(tester, FakeAuthService(user: testUser));
 
-    final Finder hub = find.byKey(const ValueKey('launcher-hub'));
-    final Offset start = tester.getCenter(hub);
+    final Offset start = tester.getCenter(_hub);
     TestGesture gesture = await tester.startGesture(start);
     for (int i = 0; i < 16; i++) {
       await tester.pump(const Duration(milliseconds: 100));
@@ -86,7 +203,8 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
 
-    expect(tester.getCenter(hub).dx, closeTo(120, 1));
-    expect(storage.hubPosition, isNotNull);
+    expect(tester.getCenter(_hub).dx, closeTo(120, 1));
+    final SharedPreferences preferences = await SharedPreferences.getInstance();
+    expect(preferences.getDouble(AppSettingsCubit.hubXKey), isNotNull);
   });
 }

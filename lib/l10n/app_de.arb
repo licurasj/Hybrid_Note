@@ -293,5 +293,10 @@
   "ruleRepeatField": "Wiederholungsfeld",
   "ruleMoveField": "Feld",
   "ruleMoveFrom": "Verschieben von",
-  "ruleMoveTo": "Verschieben nach"
+  "ruleMoveTo": "Verschieben nach",
+  "account": "Konto",
+  "blankList": "Leer",
+  "signInFailed": "Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
+  "signInOffline": "Keine Verbindung. Zum Anmelden mit dem Internet verbinden.",
+  "signOutFailed": "Abmeldung fehlgeschlagen. Bitte erneut versuchen."
 }

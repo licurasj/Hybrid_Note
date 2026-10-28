@@ -293,5 +293,10 @@
   "ruleRepeatField": "Campo de repetición",
   "ruleMoveField": "Campo",
   "ruleMoveFrom": "Mover de",
-  "ruleMoveTo": "Mover a"
+  "ruleMoveTo": "Mover a",
+  "account": "Cuenta",
+  "blankList": "En blanco",
+  "signInFailed": "No se pudo iniciar sesión. Inténtalo de nuevo.",
+  "signInOffline": "Sin conexión. Conéctate a internet para iniciar sesión.",
+  "signOutFailed": "No se pudo cerrar sesión. Inténtalo de nuevo."
 }

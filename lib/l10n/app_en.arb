@@ -660,5 +660,10 @@
   "ruleRepeatField": "Repeat field",
   "ruleMoveField": "Field",
   "ruleMoveFrom": "Move from",
-  "ruleMoveTo": "Move to"
+  "ruleMoveTo": "Move to",
+  "account": "Account",
+  "blankList": "Blank",
+  "signInFailed": "Sign-in failed. Please try again.",
+  "signInOffline": "No connection. Connect to the internet to sign in.",
+  "signOutFailed": "Sign-out failed. Please try again."
 }

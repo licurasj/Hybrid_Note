@@ -808,4 +808,20 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get ruleMoveTo => 'Déplacer vers';
+
+  @override
+  String get account => 'Compte';
+
+  @override
+  String get blankList => 'Vide';
+
+  @override
+  String get signInFailed => 'La connexion a échoué. Veuillez réessayer.';
+
+  @override
+  String get signInOffline =>
+      'Pas de connexion. Connectez-vous à Internet pour vous connecter.';
+
+  @override
+  String get signOutFailed => 'La déconnexion a échoué. Veuillez réessayer.';
 }

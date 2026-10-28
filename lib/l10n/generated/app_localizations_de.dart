@@ -808,4 +808,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get ruleMoveTo => 'Verschieben nach';
+
+  @override
+  String get account => 'Konto';
+
+  @override
+  String get blankList => 'Leer';
+
+  @override
+  String get signInFailed =>
+      'Anmeldung fehlgeschlagen. Bitte erneut versuchen.';
+
+  @override
+  String get signInOffline =>
+      'Keine Verbindung. Zum Anmelden mit dem Internet verbinden.';
+
+  @override
+  String get signOutFailed =>
+      'Abmeldung fehlgeschlagen. Bitte erneut versuchen.';
 }

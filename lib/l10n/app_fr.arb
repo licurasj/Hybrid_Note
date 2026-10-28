@@ -293,5 +293,10 @@
   "ruleRepeatField": "Champ de répétition",
   "ruleMoveField": "Champ",
   "ruleMoveFrom": "Déplacer de",
-  "ruleMoveTo": "Déplacer vers"
+  "ruleMoveTo": "Déplacer vers",
+  "account": "Compte",
+  "blankList": "Vide",
+  "signInFailed": "La connexion a échoué. Veuillez réessayer.",
+  "signInOffline": "Pas de connexion. Connectez-vous à Internet pour vous connecter.",
+  "signOutFailed": "La déconnexion a échoué. Veuillez réessayer."
 }

@@ -1489,6 +1489,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Move to'**
   String get ruleMoveTo;
+
+  /// No description provided for @account.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get account;
+
+  /// No description provided for @blankList.
+  ///
+  /// In en, this message translates to:
+  /// **'Blank'**
+  String get blankList;
+
+  /// No description provided for @signInFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in failed. Please try again.'**
+  String get signInFailed;
+
+  /// No description provided for @signInOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection. Connect to the internet to sign in.'**
+  String get signInOffline;
+
+  /// No description provided for @signOutFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-out failed. Please try again.'**
+  String get signOutFailed;
 }
 
 class _AppLocalizationsDelegate

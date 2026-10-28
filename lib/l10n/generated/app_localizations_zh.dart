@@ -800,4 +800,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ruleMoveTo => '移动到';
+
+  @override
+  String get account => '账户';
+
+  @override
+  String get blankList => '空白';
+
+  @override
+  String get signInFailed => '登录失败，请重试。';
+
+  @override
+  String get signInOffline => '无网络连接。请连接互联网后登录。';
+
+  @override
+  String get signOutFailed => '退出登录失败，请重试。';
 }

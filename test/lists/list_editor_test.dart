@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hybrid_note/app_cubit.dart';
 import 'package:hybrid_note/backend/firestore_list_store.dart';
 import 'package:hybrid_note/lists/builtin_templates.dart';
 import 'package:hybrid_note/lists/list_definition.dart';
 import 'package:hybrid_note/lists/list_item.dart';
 import 'package:hybrid_note/lists/list_rules.dart';
-import 'package:hybrid_note/lists/list_store.dart';
-import 'package:hybrid_note/app/hybrid_note_app.dart';
 
-import '../support/fakes.dart';
+import '../support/fake_auth.dart';
 import '../support/firestore_store.dart';
 
 // The app on a store holding [lists]; none unless given, so the user's own
@@ -22,20 +19,9 @@ Future<FirestoreListStore> _pumpApp(WidgetTester tester, {List<ListDefinition> l
   addTearDown(tester.view.reset);
 
   final FirestoreListStore store = await widgetTestStore(tester, lists: lists);
+  SharedPreferences.setMockInitialValues({});
   await tester.pumpWidget(
-    MultiBlocProvider(
-      providers: [
-        BlocProvider(
-          create: (_) => AppCubit(
-            storage: FakeAppStorage(),
-            driveSyncService: FakeDriveSyncService(),
-            deviceId: 'd',
-          )..loadData(),
-        ),
-        RepositoryProvider<ListStore>.value(value: store),
-      ],
-      child: const HybridNoteApp(),
-    ),
+    await testApp(auth: FakeAuthService(user: testUser), openStore: (_) => store),
   );
   await settle(tester);
   return store;
@@ -52,6 +38,8 @@ void main() {
 
     await _openLauncher(tester);
     await tester.tap(find.byKey(const ValueKey('launcher-add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('template-blank')));
     await tester.pumpAndSettle();
     expect(find.text('New list'), findsOneWidget);
 
