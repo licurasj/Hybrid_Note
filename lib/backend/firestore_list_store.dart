@@ -87,6 +87,9 @@ class FirestoreListStore implements ListStore {
   late final StreamSubscription<Object?> _listsSubscription;
   // Each item's `_rev`, by list and item id.
   final Map<String, Map<String, int>> _revs = {};
+  // The ids of every item document under each list, including the ones
+  // skipped as malformed, so a list delete removes them all (T-14 R3).
+  final Map<String, Set<String>> _docIds = {};
   // What each item was last checked as for repair: the list revision and
   // the item's updatedAt, so a later stale write of it is checked again.
   final Map<String, String> _checked = {};
@@ -134,6 +137,7 @@ class FirestoreListStore implements ListStore {
         _itemSubscriptions.remove(listId)!.cancel();
         _items.remove(listId);
         _revs.remove(listId);
+        _docIds.remove(listId);
       }
     }
     for (final String listId in _definitions.keys) {
@@ -175,6 +179,7 @@ class FirestoreListStore implements ListStore {
     }
     _items[listId] = items;
     _revs[listId] = revs;
+    _docIds[listId] = {for (final doc in snapshot.docs) doc.id};
     _update();
   }
 
@@ -643,9 +648,16 @@ class FirestoreListStore implements ListStore {
     if (definition == null) {
       return null;
     }
+    // Undo restores the valid items; the delete removes every document,
+    // the malformed ones as well (T-14 R3). An item another device adds
+    // meanwhile, before this device has seen it, stays behind unseen.
     final List<ListItem> items = _items[listId]?.values.toList() ?? const [];
     await _write([
-      for (final ListItem item in items) _deleteItem(listId, item.id),
+      for (final String itemId in {
+        ...?_docIds[listId],
+        for (final ListItem item in items) item.id,
+      })
+        _deleteItem(listId, itemId),
       (batch) => batch.delete(_lists.doc(listId)),
     ]);
     return DeletedList(definition: definition, items: items);

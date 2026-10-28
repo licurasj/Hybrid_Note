@@ -593,6 +593,40 @@ void main() {
       _measure('a transaction of 501 writes on the emulator: $outcome');
     });
 
+    // T-14 R3: Firestore keeps a subcollection when its parent is deleted.
+    test('deleting a list leaves no item documents, malformed ones '
+        'included', () async {
+      final (String uid, _) = await _newUser();
+      await _seed(uid);
+      final List<String> skipped = [];
+      final FirestoreListStore store = await _loaded(
+        _db,
+        uid,
+        onSkipped: (path, _) => skipped.add(path),
+      );
+      expect(
+        await store.createList(
+          _garden('garden'),
+          items: [_row('garden', 'fern'), _row('garden', 'ivy')],
+        ),
+        isEmpty,
+      );
+      // Passes the rules, but the read side skips it.
+      await _db.doc('users/$uid/lists/garden/items/bad').set({
+        ..._row('garden', 'bad').toJson(),
+        'createdAt': 'not a date',
+      });
+      await _until(store, (c) => c.itemsOf('garden').length == 2);
+      await _eventually(() async => skipped.isNotEmpty);
+
+      final DeletedList? deleted = await store.deleteList('garden');
+      expect(deleted!.items.map((i) => i.id), unorderedEquals(['fern', 'ivy']));
+      final QuerySnapshot<Map<String, dynamic>> left = await _db
+          .collection('users/$uid/lists/garden/items')
+          .get(const GetOptions(source: Source.server));
+      expect(left.docs, isEmpty);
+    });
+
     test('the repair rewrites a late stale item under the rules', () async {
       final (String uid, _) = await _newUser();
       await _seed(uid);

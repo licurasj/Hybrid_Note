@@ -50,12 +50,19 @@ Future<FirestoreListStore> _loaded(
 
 // fake_cloud_firestore runs a transaction's writes straight away and never
 // retries it; this one can also run a write of "another device" first, fail
-// like an offline client or never finish.
+// like an offline client or never finish. Batches can run such a write
+// before they commit, and their deletes are recorded, since the fake (unlike
+// Firestore) deletes a document's subcollections with it.
 class _ScriptedFirestore extends FakeFirebaseFirestore {
   int transactions = 0;
   Future<void> Function()? beforeTransaction;
+  Future<void> Function()? beforeBatch;
+  final List<String> deleted = [];
   Object? failWith;
   bool hang = false;
+
+  @override
+  WriteBatch batch() => _ScriptedBatch(this, super.batch());
 
   @override
   Future<T> runTransaction<T>(
@@ -77,6 +84,35 @@ class _ScriptedFirestore extends FakeFirebaseFirestore {
       timeout: timeout,
       maxAttempts: maxAttempts,
     );
+  }
+}
+
+class _ScriptedBatch implements WriteBatch {
+  _ScriptedBatch(this._firestore, this._batch);
+
+  final _ScriptedFirestore _firestore;
+  final WriteBatch _batch;
+
+  @override
+  Future<void> commit() async {
+    await _firestore.beforeBatch?.call();
+    return _batch.commit();
+  }
+
+  @override
+  void delete(DocumentReference document) {
+    _firestore.deleted.add(document.path);
+    _batch.delete(document);
+  }
+
+  @override
+  void set<T>(DocumentReference<T> document, T data, [SetOptions? options]) {
+    _batch.set(document, data, options);
+  }
+
+  @override
+  void update<T>(DocumentReference<T> document, T data) {
+    _batch.update(document, data);
   }
 }
 
@@ -497,6 +533,59 @@ void main() {
         await store.apply(ListChanges(saved: [_row('list-a', 3)]));
         await _until(store, (c) => c.itemsOf('list-a').length == 2);
         expect(skipped, hasLength(6));
+      },
+    );
+
+    // T-14 R3: Firestore does not delete a subcollection with its parent.
+    test(
+      'deleting a list removes its malformed item documents as well',
+      () async {
+        final _ScriptedFirestore firestore = await _seeded(
+          _ScriptedFirestore(),
+        );
+        final FirestoreListStore store = await _loaded(firestore);
+        await store.createList(
+          _simple('list-a'),
+          items: [_row('list-a', 1), _row('list-a', 2)],
+        );
+        final String items = 'users/$_uid/lists/list-a/items';
+        final Map<String, dynamic> base = _row('list-a', 3).toJson();
+        await firestore.doc('$items/bad-values').set({
+          ...base,
+          'id': 'bad-values',
+          'values': 'x',
+        });
+        await firestore.doc('$items/bad-date').set({
+          ...base,
+          'id': 'bad-date',
+          'createdAt': 7,
+        });
+        await _until(store, (c) => c.itemsOf('list-a').length == 2);
+        await pumpEventQueue();
+
+        final DeletedList? deleted = await store.deleteList('list-a');
+        expect(
+          deleted!.items.map((i) => i.id),
+          unorderedEquals(['list-a-item-1', 'list-a-item-2']),
+        );
+        expect(
+          firestore.deleted,
+          unorderedEquals([
+            for (final String id in [
+              'list-a-item-1',
+              'list-a-item-2',
+              'bad-values',
+              'bad-date',
+            ])
+              '$items/$id',
+            'users/$_uid/lists/list-a',
+          ]),
+        );
+        expect((await firestore.collection(items).get()).docs, isEmpty);
+        expect(
+          (await firestore.doc('users/$_uid/lists/list-a').get()).exists,
+          isFalse,
+        );
       },
     );
 
