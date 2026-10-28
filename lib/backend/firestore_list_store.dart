@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../lists/builtin_templates.dart';
 import '../lists/list_catalog.dart';
 import '../lists/list_definition.dart';
+import '../lists/list_error.dart';
 import '../lists/list_item.dart';
 import '../lists/list_patch.dart';
 import '../lists/list_rules.dart';
@@ -461,30 +462,30 @@ class FirestoreListStore implements ListStore {
   Future<void> refresh() async {}
 
   @override
-  Future<List<String>> createList(
+  Future<List<ListError>> createList(
     ListDefinition definition, {
     List<ListItem> items = const [],
   }) async {
     await _ready.future;
     if (_definitions.containsKey(definition.id) ||
         BuiltinTemplates.isBuiltin(definition.id)) {
-      return ['list "${definition.id}" already exists'];
+      return [ListError(ListErrorCode.listExists, {'list': definition.id})];
     }
     // Item ids are unique across every list, since item deletes go by id.
     final Set<String> newIds = {};
-    final List<String> errors = [
+    final List<ListError> errors = [
       ...definition.validate(),
       for (final ListItem item in items)
         if (!newIds.add(item.id))
-          'item "${item.id}": duplicate id'
+          ListError(ListErrorCode.duplicateItemId, const {}, item.id)
         else if (_listOfItem(item.id) != null)
-          'item "${item.id}": id already used by another list',
+          ListError(ListErrorCode.itemIdTaken, const {}, item.id),
       for (final ListItem item in items)
         if (item.listId != definition.id)
-          'item "${item.id}": belongs to list "${item.listId}"'
+          ListError(ListErrorCode.itemInOtherList, {'list': item.listId}, item.id)
         else
-          for (final String error in item.validateAgainst(definition))
-            'item "${item.id}": $error',
+          for (final ListError error in item.validateAgainst(definition))
+            error.forItem(item.id),
     ];
     if (errors.isEmpty) {
       await _write([
