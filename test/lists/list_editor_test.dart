@@ -7,6 +7,7 @@ import 'package:hybrid_note/lists/custom_lists.dart';
 import 'package:hybrid_note/lists/list_definition.dart';
 import 'package:hybrid_note/lists/list_item.dart';
 import 'package:hybrid_note/lists/list_rules.dart';
+import 'package:hybrid_note/lists/local_list_store.dart';
 import 'package:hybrid_note/main.dart';
 
 import '../support/fakes.dart';
@@ -16,7 +17,7 @@ Future<CustomListsCubit> _pumpApp(WidgetTester tester) async {
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 
-  final CustomListsCubit custom = CustomListsCubit(FakeCustomListsStorage());
+  final CustomListsCubit custom = CustomListsCubit(FakeCustomListsStorage())..load();
   await tester.pumpWidget(
     MultiBlocProvider(
       providers: [
@@ -28,6 +29,7 @@ Future<CustomListsCubit> _pumpApp(WidgetTester tester) async {
           )..loadData(),
         ),
         BlocProvider.value(value: custom),
+        LocalListStore.provider(),
       ],
       child: const HybridNoteApp(),
     ),

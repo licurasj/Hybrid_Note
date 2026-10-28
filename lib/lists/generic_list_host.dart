@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../app_cubit.dart';
-import '../app_state.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'builtin_templates.dart';
-import 'custom_lists.dart';
 import 'generic_list_screen.dart';
-import 'list_catalog.dart';
+import 'list_catalog_builder.dart';
 import 'list_definition.dart';
 import 'list_labels.dart';
+import 'list_store.dart';
 
 // One list on the generic screen, built-in or the user's own.
 class GenericListHost extends StatelessWidget {
@@ -70,29 +68,21 @@ class GenericListHost extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AppLocalizations loc = AppLocalizations.of(context);
-    final RoutingListStore store = RoutingListStore(
-      context.read<AppCubit>(),
-      context.read<CustomListsCubit>(),
-    );
+    final ListStore store = context.read<ListStore>();
 
-    return BlocBuilder<CustomListsCubit, CustomListsData>(
-      builder: (context, custom) {
-        return BlocBuilder<AppCubit, AppState>(
-          builder: (context, state) {
-            final ListCatalog catalog = ListCatalog.from(state, custom);
-            final ListDefinition? definition = catalog.definition(listId);
-            if (definition == null) {
-              // The list was deleted while open.
-              return Scaffold(appBar: AppBar());
-            }
+    return ListCatalogBuilder(
+      builder: (context, catalog) {
+        final ListDefinition? definition = catalog.definition(listId);
+        if (definition == null) {
+          // The list was deleted while open.
+          return Scaffold(appBar: AppBar());
+        }
 
-            return GenericListScreen(
-              definition: definition,
-              items: catalog.itemsOf(listId),
-              store: store,
-              texts: textsFor(listId, loc, definition),
-            );
-          },
+        return GenericListScreen(
+          definition: definition,
+          items: catalog.itemsOf(listId),
+          store: store,
+          texts: textsFor(listId, loc, definition),
         );
       },
     );

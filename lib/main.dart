@@ -15,11 +15,14 @@ import 'lists/builtin_templates.dart';
 import 'lists/generic_list_host.dart';
 import 'lists/custom_lists.dart';
 import 'lists/list_catalog.dart';
+import 'lists/list_catalog_builder.dart';
 import 'lists/list_definition.dart';
 import 'lists/list_editor_screen.dart';
 import 'lists/list_icons.dart';
 import 'lists/list_labels.dart';
 import 'lists/list_patch.dart';
+import 'lists/list_store.dart';
+import 'lists/local_list_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +46,7 @@ Future<void> main() async {
         BlocProvider(
           create: (_) => CustomListsCubit(CustomListsStorage())..load(),
         ),
+        LocalListStore.provider(),
       ],
       child: const HybridNoteApp(),
     ),
@@ -339,13 +343,6 @@ class _MainShellState extends State<MainShell> {
     ];
   }
 
-  ListCatalog _catalog() {
-    return ListCatalog.from(
-      context.read<AppCubit>().state,
-      context.read<CustomListsCubit>().state,
-    );
-  }
-
   Future<void> _newList() async {
     final AppLocalizations loc = AppLocalizations.of(context);
     final ListEditorOutcome? outcome = await Navigator.of(context).push(
@@ -361,14 +358,17 @@ class _MainShellState extends State<MainShell> {
       return;
     }
 
-    await context.read<CustomListsCubit>().createList(result.definition);
-    if (mounted) {
+    final List<String> errors = await context.read<ListStore>().createList(
+      result.definition,
+    );
+    if (mounted && errors.isEmpty) {
       _openList(result.definition.id);
     }
   }
 
   Future<void> _editList(String listId) async {
-    final ListCatalog catalog = _catalog();
+    final ListStore store = context.read<ListStore>();
+    final ListCatalog catalog = store.current;
     final ListDefinition? definition = catalog.definition(listId);
     if (definition == null) {
       return;
@@ -386,35 +386,22 @@ class _MainShellState extends State<MainShell> {
       return;
     }
 
-    final CustomListsCubit custom = context.read<CustomListsCubit>();
     if (outcome.deleted) {
       await _deleteList(listId);
       return;
     }
 
-    // Re-apply the ops to the current items, in case they changed meanwhile.
-    final ListCatalog fresh = _catalog();
-    final ListDefinition? current = fresh.definition(listId);
-    if (current == null) {
-      return;
-    }
-    final ListPatchResult result = ListPatch.apply(
-      current,
-      fresh.itemsOf(listId),
-      outcome.ops,
-      DateTime.now().toUtc(),
-    );
-    if (result.isValid) {
-      await custom.savePatched(result, outcome.ops);
-    }
+    // The store re-applies the ops to its current items, in case they changed
+    // meanwhile, and saves only a valid result.
+    await store.patchList(listId, outcome.ops);
   }
 
   // Deleting is immediate, with Undo in a snackbar and no trash bin (D-5).
   Future<void> _deleteList(String listId) async {
     final AppLocalizations loc = AppLocalizations.of(context);
-    final CustomListsCubit custom = context.read<CustomListsCubit>();
+    final ListStore store = context.read<ListStore>();
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    final DeletedList? deleted = await custom.deleteList(listId);
+    final DeletedList? deleted = await store.deleteList(listId);
     if (deleted == null) {
       return;
     }
@@ -429,7 +416,7 @@ class _MainShellState extends State<MainShell> {
         duration: const Duration(seconds: 6),
         action: SnackBarAction(
           label: loc.undo,
-          onPressed: () => custom.restoreList(deleted),
+          onPressed: () => store.restoreList(deleted),
         ),
       ),
     );
@@ -452,11 +439,10 @@ class _MainShellState extends State<MainShell> {
         }
       },
       child: Scaffold(
-        body: BlocBuilder<CustomListsCubit, CustomListsData>(
-          builder: (context, custom) => BlocBuilder<AppCubit, AppState>(
+        body: ListCatalogBuilder(
+          builder: (context, catalog) => BlocBuilder<AppCubit, AppState>(
           builder: (context, state) {
             final AppLocalizations loc = AppLocalizations.of(context);
-            final ListCatalog catalog = ListCatalog.from(state, custom);
             return Stack(
               children: [
                 // Room below the dashboard so the hub never covers it.
