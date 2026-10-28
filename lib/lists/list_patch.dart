@@ -137,7 +137,7 @@ class ListPatch {
       if (needsField && index < 0) {
         errors.add(ListError(
           ListErrorCode.opNoField,
-          {'op': op.kind.wire, 'field': op.key ?? ''},
+          {'op': op.kind.wire, 'field': '${op.key}'},
         ));
         continue;
       }

@@ -141,15 +141,19 @@ void main() {
         ListPatchOp(PatchOpKind.addField, {
           'field': {'key': 'title', 'type': 'text', 'label': 'Again'},
         }),
+        // An op without its key, as malformed AI input can be.
+        ListPatchOp(PatchOpKind.removeField),
       ], DateTime.utc(2026));
 
       expect(result.errors.map((error) => '$error'), [
         'changeFieldType: unknown type "colour"',
         'addField: "title" already exists',
+        'removeField: no field "null"',
       ]);
       expect(result.errors.map((error) => error.code), [
         ListErrorCode.unknownFieldType,
         ListErrorCode.fieldExists,
+        ListErrorCode.opNoField,
       ]);
     });
   });
