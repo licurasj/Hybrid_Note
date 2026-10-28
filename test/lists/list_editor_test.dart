@@ -167,4 +167,74 @@ void main() {
     await _openLauncher(tester);
     expect(find.text('Shopping'), findsOneWidget);
   });
+
+  group('a view that names a removed or retyped field', () {
+    Future<CustomListsCubit> pumpWithFilter(WidgetTester tester) async {
+      final CustomListsCubit custom = await _pumpApp(tester);
+      await custom.createList(
+        ListDefinition.fromJson({
+          'id': 'list-plants',
+          'name': 'Plants',
+          'icon': 'local_florist',
+          'color': '#43A047',
+          'fields': [
+            {'key': 'title', 'type': 'text', 'label': 'Plant', 'required': true, 'primary': true},
+            {
+              'key': 'kind',
+              'type': 'category',
+              'label': 'Kind',
+              'options': [
+                {'value': 'fern'},
+                {'value': 'cactus'},
+              ],
+            },
+          ],
+          'view': {'kind': 'cards'},
+          'updatedAt': DateTime.utc(2026).toIso8601String(),
+        }),
+      );
+      await tester.pump();
+
+      await _openLauncher(tester);
+      await tester.longPress(find.byKey(const ValueKey('launcher-note-list-plants')));
+      await tester.pumpAndSettle();
+      // Filter the view by the category field.
+      await tester.tap(find.byKey(const ValueKey('filter-null-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Kind').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('filter-kind-1')), findsOneWidget);
+      return custom;
+    }
+
+    void expectEditorStillWorks(WidgetTester tester) {
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('filter-null-0')), findsOneWidget);
+      expect(find.byKey(const ValueKey('editor-errors')), findsOneWidget);
+      expect(
+        tester.widget<IconButton>(find.byKey(const ValueKey('save-list'))).onPressed,
+        isNull,
+      );
+    }
+
+    testWidgets('deleting the field keeps the editor working', (tester) async {
+      await pumpWithFilter(tester);
+
+      await tester.tap(find.byKey(const ValueKey('remove-field-kind')));
+      await tester.pumpAndSettle();
+
+      expectEditorStillWorks(tester);
+    });
+
+    testWidgets('changing the field to text keeps the editor working', (tester) async {
+      await pumpWithFilter(tester);
+
+      await tester.tap(find.byKey(const ValueKey('field-type-kind-category')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Text').last);
+      await tester.pumpAndSettle();
+
+      expectEditorStillWorks(tester);
+    });
+  });
 }

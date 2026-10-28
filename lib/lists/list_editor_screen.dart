@@ -268,11 +268,15 @@ class _ListEditorScreenState extends State<ListEditorScreen> {
     required Iterable<FieldDefinition> choices,
     required ValueChanged<String?> onChanged,
     List<DropdownMenuItem<String?>> extra = const [],
-    Key? key,
+    String? keyName,
   }) {
+    // A view can still name a field that was just removed or retyped; the
+    // dropdown then shows nothing, and the validation errors say what is wrong.
+    final String? shown =
+        choices.any((field) => field.key == value) ? value : null;
     return DropdownButtonFormField<String?>(
-      key: key ?? ValueKey('$label-$value-${choices.length}'),
-      initialValue: value,
+      key: ValueKey('${keyName ?? label}-$shown-${choices.length}'),
+      initialValue: shown,
       isExpanded: true,
       decoration: InputDecoration(labelText: label),
       items: [
@@ -354,7 +358,7 @@ class _ListEditorScreenState extends State<ListEditorScreen> {
           ),
         const SizedBox(height: 12),
         _fieldDropdown(
-          key: ValueKey('filter-${view.filterChipsBy}'),
+          keyName: 'filter',
           label: loc.filterBy,
           value: view.filterChipsBy,
           choices: ofType({
