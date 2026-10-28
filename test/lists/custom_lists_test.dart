@@ -65,7 +65,7 @@ void main() {
     expect(storage.data.definitions.single.field('water')!.type.wire, 'counter');
     final Map<String, ListItem> items = {for (final ListItem item in storage.data.items) item.id: item};
     expect(items['fern']!['water'], 3);
-    expect(items['cactus']!['_legacy'], {'water': 'rarely'});
+    expect(items['cactus']!['_legacy'], {'water': ['rarely']});
   });
 
   test('delete removes the list and its items; undo brings both back', () async {

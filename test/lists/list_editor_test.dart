@@ -120,7 +120,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(custom.state.definitions.single.field('water')!.type.wire, 'number');
-    expect(custom.state.items.single['_legacy'], {'water': 'rarely'});
+    expect(custom.state.items.single['_legacy'], {'water': ['rarely']});
 
     // Delete, then undo.
     await _openLauncher(tester);

@@ -43,8 +43,8 @@ void main() {
     expect(result.isValid, isTrue);
     expect(result.items[0]['price'], 4);
     expect(result.items[1]['price'], isNull);
-    expect(result.items[1]['_legacy'], {'price': r'$3'});
-    expect(result.items[2]['_legacy'], {'price': 'about 5'});
+    expect(result.items[1]['_legacy'], {'price': [r'$3']});
+    expect(result.items[2]['_legacy'], {'price': ['about 5']});
     expect(result.items[3].values.containsKey('price'), isFalse);
     expect(result.hiddenValues, 2);
     expect(result.changedItemIds, {'a', 'b', 'c', 'd'});
@@ -97,7 +97,7 @@ void main() {
     expect(toChecklist.isValid, isTrue);
     expect(toChecklist.hiddenValues, 1);
     expect(toChecklist.items.single['plan'], isNull);
-    expect(toChecklist.items.single['_legacy'], {'plan': weekly});
+    expect(toChecklist.items.single['_legacy'], {'plan': [weekly]});
     expect(toChecklist.items.single.validateAgainst(toChecklist.definition), isEmpty);
 
     final ListPatchResult toRecurrence = ListPatch.apply(plan('checklist'), [
@@ -107,8 +107,43 @@ void main() {
     ], _t1);
     expect(toRecurrence.hiddenValues, 1);
     expect(toRecurrence.items.single['plan'], isNull);
-    expect(toRecurrence.items.single['_legacy'], {'plan': steps});
+    expect(toRecurrence.items.single['_legacy'], {'plan': [steps]});
     expect(toRecurrence.items.single.validateAgainst(toRecurrence.definition), isEmpty);
+  });
+
+  test('a second failed conversion keeps the first hidden value too', () {
+    // text -> number hides "about five"; 7 entered later; number -> checklist hides 7.
+    final ListPatchResult toNumber = ListPatch.apply(_books(), [
+      _item('a', {'price': 'about five'}),
+    ], const [
+      ListPatchOp(PatchOpKind.changeFieldType, {'key': 'price', 'type': 'number'}),
+    ], _t1);
+    expect(toNumber.items.single['_legacy'], {'price': ['about five']});
+
+    final ListItem edited = ListItem(
+      id: 'a',
+      listId: 'books',
+      values: {...toNumber.items.single.values, 'price': 7},
+      createdAt: _t0,
+      updatedAt: _t1,
+    );
+    final ListPatchResult toChecklist = ListPatch.apply(toNumber.definition, [edited], const [
+      ListPatchOp(PatchOpKind.changeFieldType, {'key': 'price', 'type': 'checklist'}),
+    ], _t1);
+    expect(toChecklist.hiddenValues, 1);
+    expect(toChecklist.items.single['_legacy'], {'price': ['about five', 7]});
+  });
+
+  test('an old single hidden value reads as a one-entry list', () {
+    final ListPatchResult result = ListPatch.apply(_books(), [
+      _item('a', {'price': 'about five', '_legacy': {'price': 'older', 'shop': 'kept'}}),
+    ], const [
+      ListPatchOp(PatchOpKind.changeFieldType, {'key': 'price', 'type': 'number'}),
+    ], _t1);
+
+    expect(result.items.single['_legacy'], {'price': ['older', 'about five'], 'shop': 'kept'});
+    expect(ListPatch.archivedValues({'shop': 'kept'}, 'shop'), ['kept']);
+    expect(ListPatch.archivedValues(null, 'shop'), isEmpty);
   });
 
   test('add, rename, move and set view build a valid definition', () {
@@ -150,7 +185,7 @@ void main() {
       }),
     ], _t1);
 
-    expect(narrowed.items[2]['_legacy'], {'shop': 'Market'});
+    expect(narrowed.items[2]['_legacy'], {'shop': ['Market']});
     expect(narrowed.hiddenValues, 1);
   });
 

@@ -80,6 +80,18 @@ class ListPatch {
   // Key under which unconvertible values are kept on an item.
   static const String legacyKey = '_legacy';
 
+  // The values archived for one field in an item's `_legacy` map, oldest
+  // first (D-10). Older data kept a single value there, which reads as a
+  // one-entry list; a List is taken as the list of archived values, so an
+  // old archived list may read as several entries, but nothing is lost.
+  static List<Object?> archivedValues(Map? legacy, String key) {
+    final Object? archived = legacy?[key];
+    if (archived == null) {
+      return const [];
+    }
+    return archived is List ? List<Object?>.from(archived) : [archived];
+  }
+
   static ListPatchResult apply(
     ListDefinition definition,
     List<ListItem> items,
@@ -105,7 +117,7 @@ class ListPatch {
       final Map<String, dynamic> legacy = Map<String, dynamic>.from(
         itemValues[legacyKey] as Map? ?? const {},
       );
-      legacy[key] = itemValues.remove(key);
+      legacy[key] = [...archivedValues(legacy, key), itemValues.remove(key)];
       itemValues[legacyKey] = legacy;
       changed.add(itemId);
       hidden++;
