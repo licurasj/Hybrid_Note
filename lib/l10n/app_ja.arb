@@ -293,5 +293,15 @@
   "ruleRepeatField": "繰り返しの項目",
   "ruleMoveField": "項目",
   "ruleMoveFrom": "移動元",
-  "ruleMoveTo": "移動先"
+  "ruleMoveTo": "移動先",
+  "account": "アカウント",
+  "blankList": "空白",
+  "signInFailed": "サインインに失敗しました。もう一度お試しください。",
+  "signInOffline": "接続がありません。サインインするにはインターネットに接続してください。",
+  "signOutFailed": "サインアウトに失敗しました。もう一度お試しください。",
+  "signOutCleanupFailed": "サインアウトしましたが、この端末に保存されたリストを削除できませんでした。",
+  "tryAgain": "再試行",
+  "listChangeNotSaved": "リストの変更を保存できなかったため、元に戻しました。",
+  "starterListsFailed": "初期リストを作成できませんでした。",
+  "startEmpty": "空で始める"
 }

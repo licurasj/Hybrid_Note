@@ -293,5 +293,15 @@
   "ruleRepeatField": "Wiederholungsfeld",
   "ruleMoveField": "Feld",
   "ruleMoveFrom": "Verschieben von",
-  "ruleMoveTo": "Verschieben nach"
+  "ruleMoveTo": "Verschieben nach",
+  "account": "Konto",
+  "blankList": "Leer",
+  "signInFailed": "Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
+  "signInOffline": "Keine Verbindung. Zum Anmelden mit dem Internet verbinden.",
+  "signOutFailed": "Abmeldung fehlgeschlagen. Bitte erneut versuchen.",
+  "signOutCleanupFailed": "Abgemeldet, aber die auf diesem Gerät gespeicherten Listen konnten nicht gelöscht werden.",
+  "tryAgain": "Erneut versuchen",
+  "listChangeNotSaved": "Eine Listenänderung konnte nicht gespeichert werden und wurde rückgängig gemacht.",
+  "starterListsFailed": "Die Startlisten konnten nicht eingerichtet werden.",
+  "startEmpty": "Leer beginnen"
 }

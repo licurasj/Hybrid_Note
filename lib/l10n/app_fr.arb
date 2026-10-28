@@ -293,5 +293,15 @@
   "ruleRepeatField": "Champ de répétition",
   "ruleMoveField": "Champ",
   "ruleMoveFrom": "Déplacer de",
-  "ruleMoveTo": "Déplacer vers"
+  "ruleMoveTo": "Déplacer vers",
+  "account": "Compte",
+  "blankList": "Vide",
+  "signInFailed": "La connexion a échoué. Veuillez réessayer.",
+  "signInOffline": "Pas de connexion. Connectez-vous à Internet pour vous connecter.",
+  "signOutFailed": "La déconnexion a échoué. Veuillez réessayer.",
+  "signOutCleanupFailed": "Déconnecté, mais les listes enregistrées sur cet appareil n'ont pas pu être supprimées.",
+  "tryAgain": "Réessayer",
+  "listChangeNotSaved": "Une modification de liste n'a pas pu être enregistrée et a été annulée.",
+  "starterListsFailed": "Les listes de départ n'ont pas pu être créées.",
+  "startEmpty": "Commencer sans listes"
 }

@@ -806,4 +806,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ruleMoveTo => 'Move to';
+
+  @override
+  String get account => 'Account';
+
+  @override
+  String get blankList => 'Blank';
+
+  @override
+  String get signInFailed => 'Sign-in failed. Please try again.';
+
+  @override
+  String get signInOffline =>
+      'No connection. Connect to the internet to sign in.';
+
+  @override
+  String get signOutFailed => 'Sign-out failed. Please try again.';
+
+  @override
+  String get signOutCleanupFailed =>
+      'Signed out, but the lists saved on this device could not be deleted.';
+
+  @override
+  String get tryAgain => 'Try again';
+
+  @override
+  String get listChangeNotSaved =>
+      'A list change could not be saved and was undone.';
+
+  @override
+  String get starterListsFailed => 'The starter lists could not be set up.';
+
+  @override
+  String get startEmpty => 'Start empty';
 }
