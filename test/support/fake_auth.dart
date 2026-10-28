@@ -8,6 +8,7 @@ import 'package:hybrid_note/app/app_settings.dart';
 import 'package:hybrid_note/app/hybrid_note_app.dart';
 import 'package:hybrid_note/backend/auth_service.dart';
 import 'package:hybrid_note/backend/firestore_list_store.dart';
+import 'package:hybrid_note/backend/firestore_setup.dart';
 
 import 'firestore_store.dart';
 
@@ -75,10 +76,12 @@ class FakeAuthService implements AuthService {
 }
 
 // The whole app (gate, shell, settings) on [auth], opening [store] for
-// whoever signs in. Call SharedPreferences.setMockInitialValues first.
+// whoever signs in, with [starter] as its starter-list seeding (done unless
+// given). Call SharedPreferences.setMockInitialValues first.
 Future<Widget> testApp({
   required FakeAuthService auth,
   required FirestoreListStore Function(AuthUser user) openStore,
+  StarterSeeding? starter,
   VoidCallback? afterSignOut,
 }) async {
   final SharedPreferences preferences = await SharedPreferences.getInstance();
@@ -86,7 +89,10 @@ Future<Widget> testApp({
     create: (_) => AppSettingsCubit(preferences),
     child: HybridNoteApp(
       auth: auth,
-      openStore: openStore,
+      openStore: (user) => (
+        store: openStore(user),
+        starter: starter ?? StarterSeeding.done(),
+      ),
       afterSignOut: afterSignOut,
     ),
   );

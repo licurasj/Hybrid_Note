@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'app/app_settings.dart';
 import 'app/hybrid_note_app.dart';
+import 'app/starter_note.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'lists/list_catalog.dart';
 import 'lists/list_catalog_builder.dart';
@@ -182,6 +183,7 @@ class HomeScreen extends StatelessWidget {
             builder: (context, catalog) => ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                if (catalog.definitions.isEmpty) const StarterNote(),
                 for (final ListDefinition definition in catalog.definitions)
                   _summaryCard(
                     context: context,

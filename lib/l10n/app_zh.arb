@@ -301,5 +301,7 @@
   "signOutFailed": "退出登录失败，请重试。",
   "signOutCleanupFailed": "已退出登录，但无法删除保存在此设备上的列表。",
   "tryAgain": "重试",
-  "listChangeNotSaved": "列表更改无法保存，已撤销。"
+  "listChangeNotSaved": "列表更改无法保存，已撤销。",
+  "starterListsFailed": "无法创建初始列表。",
+  "startEmpty": "从空白开始"
 }

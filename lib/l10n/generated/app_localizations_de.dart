@@ -837,4 +837,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get listChangeNotSaved =>
       'Eine Listenänderung konnte nicht gespeichert werden und wurde rückgängig gemacht.';
+
+  @override
+  String get starterListsFailed =>
+      'Die Startlisten konnten nicht eingerichtet werden.';
+
+  @override
+  String get startEmpty => 'Leer beginnen';
 }

@@ -41,6 +41,30 @@ class _OfflineFirestore extends FakeFirebaseFirestore {
   }
 }
 
+// Fails the first [failures] transactions like an unreachable server.
+class _FlakyFirestore extends FakeFirebaseFirestore {
+  int failures = 0;
+  int transactions = 0;
+
+  @override
+  Future<T> runTransaction<T>(
+    TransactionHandler<T> transactionHandler, {
+    Duration timeout = const Duration(seconds: 30),
+    int maxAttempts = 5,
+  }) async {
+    transactions++;
+    if (failures > 0) {
+      failures--;
+      throw FirebaseException(plugin: 'cloud_firestore', code: 'unavailable');
+    }
+    return super.runTransaction(
+      transactionHandler,
+      timeout: timeout,
+      maxAttempts: maxAttempts,
+    );
+  }
+}
+
 void main() {
   group('StarterLists (Q-22 D)', () {
     test('a new account gets the marker and a copy of each template', () async {
@@ -165,6 +189,49 @@ void main() {
       addTearDown(again.store.close);
       expect(await again.starter, isTrue);
       await _until(again.store, (c) => c.definitions.length == 4);
+    });
+
+    test('a failed seeding waits for Try again: no retry by itself (Q-27)',
+        () async {
+      final _FlakyFirestore firestore = _FlakyFirestore()..failures = 1;
+      final opened = FirestoreSetup(firestore).openStore(
+        _uid,
+        onSeedError: (_) {},
+      );
+      addTearDown(opened.store.close);
+
+      expect(await opened.starter, isNull);
+      expect(opened.seeding.status, StarterStatus.failed);
+      await pumpEventQueue();
+      expect(firestore.transactions, 1);
+
+      expect(await opened.seeding.retry(), isTrue);
+      expect(opened.seeding.status, StarterStatus.done);
+      await _until(opened.store, (c) => c.definitions.length == 4);
+    });
+
+    test('Start empty writes the marker only: no starter lists later',
+        () async {
+      final _FlakyFirestore firestore = _FlakyFirestore()..failures = 1;
+      final opened = FirestoreSetup(firestore).openStore(
+        _uid,
+        onSeedError: (_) {},
+      );
+      addTearDown(opened.store.close);
+      expect(await opened.starter, isNull);
+
+      expect(await opened.seeding.startEmpty(), isTrue);
+      expect(opened.seeding.status, StarterStatus.done);
+      expect(
+        (await StarterLists.marker(firestore, _uid).get()).data(),
+        contains(StarterLists.seededAtKey),
+      );
+      // A later start (or Try again) finds the marker and writes nothing.
+      expect(await StarterLists.ensure(firestore, _uid), isFalse);
+      expect(
+        (await firestore.collection('users/$_uid/lists').get()).docs,
+        isEmpty,
+      );
     });
   });
 }

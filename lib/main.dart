@@ -26,7 +26,10 @@ Future<void> main() async {
       create: (_) => AppSettingsCubit(preferences),
       child: HybridNoteApp(
         auth: AuthService(clearCache: setup.clearCache),
-        openStore: (user) => setup.openStore(user.uid).store,
+        openStore: (user) {
+          final opened = setup.openStore(user.uid);
+          return (store: opened.store, starter: opened.seeding);
+        },
         afterSignOut: setup.reloadAfterClear ? reloadPage : null,
       ),
     ),

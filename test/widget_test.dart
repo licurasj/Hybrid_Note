@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hybrid_note/app/app_settings.dart';
 import 'package:hybrid_note/backend/auth_service.dart';
 import 'package:hybrid_note/backend/firestore_list_store.dart';
+import 'package:hybrid_note/backend/firestore_setup.dart';
 import 'package:hybrid_note/lists/builtin_templates.dart';
 import 'package:hybrid_note/lists/generic_list_screen.dart';
 import 'package:hybrid_note/lists/list_definition.dart';
@@ -352,6 +353,69 @@ void main() {
     await settle(tester);
     expect(find.text('A list change could not be saved and was undone.'),
         findsOneWidget);
+  });
+
+  group('starter lists could not be written (Q-27)', () {
+    // An empty account whose seeding failed once; [seeds] records each
+    // later attempt (empty = "Start empty").
+    Future<List<bool>> pumpFailed(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      SharedPreferences.setMockInitialValues(const {});
+      final List<bool> seeds = [];
+      bool fail = true;
+      final StarterSeeding starter = StarterSeeding(({required empty}) async {
+        if (fail) {
+          fail = false;
+          throw StateError('unavailable');
+        }
+        seeds.add(empty);
+        return true;
+      }, onError: (_) {});
+      await starter.start();
+      expect(starter.status, StarterStatus.failed);
+      final FirestoreListStore store = await widgetTestStore(
+        tester,
+        lists: const [],
+      );
+      await tester.pumpWidget(
+        await testApp(
+          auth: FakeAuthService(user: testUser),
+          openStore: (_) => store,
+          starter: starter,
+        ),
+      );
+      await settle(tester);
+      return seeds;
+    }
+
+    testWidgets('the empty home says so; Try again seeds now', (
+      WidgetTester tester,
+    ) async {
+      final List<bool> seeds = await pumpFailed(tester);
+      expect(
+        find.text('The starter lists could not be set up.'),
+        findsOneWidget,
+      );
+      expect(seeds, isEmpty);
+
+      await tester.tap(find.byKey(const ValueKey('starter-retry')));
+      await settle(tester);
+      expect(seeds, [false]);
+      expect(find.byKey(const ValueKey('starter-failed')), findsNothing);
+    });
+
+    testWidgets('Start empty writes the marker without lists', (
+      WidgetTester tester,
+    ) async {
+      final List<bool> seeds = await pumpFailed(tester);
+
+      await tester.tap(find.byKey(const ValueKey('starter-empty')));
+      await settle(tester);
+      expect(seeds, [true]);
+      expect(find.byKey(const ValueKey('starter-failed')), findsNothing);
+    });
   });
 
   testWidgets('the hub can be moved and its position is saved', (

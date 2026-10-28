@@ -824,4 +824,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get listChangeNotSaved => '列表更改无法保存，已撤销。';
+
+  @override
+  String get starterListsFailed => '无法创建初始列表。';
+
+  @override
+  String get startEmpty => '从空白开始';
 }

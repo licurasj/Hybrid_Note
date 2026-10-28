@@ -826,4 +826,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get listChangeNotSaved => 'リストの変更を保存できなかったため、元に戻しました。';
+
+  @override
+  String get starterListsFailed => '初期リストを作成できませんでした。';
+
+  @override
+  String get startEmpty => '空で始める';
 }

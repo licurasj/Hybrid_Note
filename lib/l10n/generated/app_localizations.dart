@@ -1537,6 +1537,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A list change could not be saved and was undone.'**
   String get listChangeNotSaved;
+
+  /// No description provided for @starterListsFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The starter lists could not be set up.'**
+  String get starterListsFailed;
+
+  /// No description provided for @startEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Start empty'**
+  String get startEmpty;
 }
 
 class _AppLocalizationsDelegate

@@ -833,4 +833,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get listChangeNotSaved =>
       'A list change could not be saved and was undone.';
+
+  @override
+  String get starterListsFailed => 'The starter lists could not be set up.';
+
+  @override
+  String get startEmpty => 'Start empty';
 }

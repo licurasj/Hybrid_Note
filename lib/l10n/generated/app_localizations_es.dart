@@ -834,4 +834,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get listChangeNotSaved =>
       'No se pudo guardar un cambio en una lista y se ha deshecho.';
+
+  @override
+  String get starterListsFailed => 'No se pudieron crear las listas iniciales.';
+
+  @override
+  String get startEmpty => 'Empezar sin listas';
 }

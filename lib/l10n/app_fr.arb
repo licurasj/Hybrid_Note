@@ -301,5 +301,7 @@
   "signOutFailed": "La déconnexion a échoué. Veuillez réessayer.",
   "signOutCleanupFailed": "Déconnecté, mais les listes enregistrées sur cet appareil n'ont pas pu être supprimées.",
   "tryAgain": "Réessayer",
-  "listChangeNotSaved": "Une modification de liste n'a pas pu être enregistrée et a été annulée."
+  "listChangeNotSaved": "Une modification de liste n'a pas pu être enregistrée et a été annulée.",
+  "starterListsFailed": "Les listes de départ n'ont pas pu être créées.",
+  "startEmpty": "Commencer sans listes"
 }

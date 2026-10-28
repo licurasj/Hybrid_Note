@@ -301,5 +301,7 @@
   "signOutFailed": "No se pudo cerrar sesión. Inténtalo de nuevo.",
   "signOutCleanupFailed": "Sesión cerrada, pero no se pudieron borrar las listas guardadas en este dispositivo.",
   "tryAgain": "Reintentar",
-  "listChangeNotSaved": "No se pudo guardar un cambio en una lista y se ha deshecho."
+  "listChangeNotSaved": "No se pudo guardar un cambio en una lista y se ha deshecho.",
+  "starterListsFailed": "No se pudieron crear las listas iniciales.",
+  "startEmpty": "Empezar sin listas"
 }

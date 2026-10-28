@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../backend/auth_service.dart';
 import '../backend/firestore_list_store.dart';
+import '../backend/firestore_setup.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../lists/list_store.dart';
 import 'app_settings.dart';
@@ -12,9 +13,11 @@ import 'app_theme.dart';
 import 'main_shell.dart';
 import 'sign_in_screen.dart';
 
-// Opens the list store of a signed-in user (FirestoreSetup.openStore in the
-// app, a fake_cloud_firestore store in tests).
-typedef StoreOpener = FirestoreListStore Function(AuthUser user);
+// Opens the list store of a signed-in user and writes their starter lists
+// (FirestoreSetup.openStore in the app, a fake_cloud_firestore store in
+// tests).
+typedef OpenedStore = ({FirestoreListStore store, StarterSeeding starter});
+typedef StoreOpener = OpenedStore Function(AuthUser user);
 
 // The signed-in account as the shell sees it: who is signed in, and how to
 // sign out (the gate closes the store first).
@@ -61,6 +64,7 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
   // The user on screen and their store.
   AuthUser? _user;
   FirestoreListStore? _store;
+  StarterSeeding? _starter;
   StreamSubscription<Object>? _writeFailures;
   // The user Firebase last reported; shown once no sign-out is running.
   AuthUser? _latest;
@@ -102,7 +106,11 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
       _known = true;
       _user = user;
       if (!sameUser) {
-        _store = user == null ? null : widget.openStore(user);
+        final OpenedStore? opened = user == null
+            ? null
+            : widget.openStore(user);
+        _store = opened?.store;
+        _starter = opened?.starter;
       }
     });
     if (!sameUser) {
@@ -233,6 +241,9 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<ListStore>.value(value: store),
+        RepositoryProvider<StarterSeeding>.value(
+          value: _starter ?? StarterSeeding.done(),
+        ),
         RepositoryProvider<SignedInAccount>.value(
           value: SignedInAccount(user: user, signOut: _signOut),
         ),

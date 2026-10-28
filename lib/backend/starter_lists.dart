@@ -19,6 +19,9 @@ import 'firestore_list_store.dart';
 // list) and the template's `templateId`. Their `_createdAt` is staggered by
 // a millisecond so they keep the template order. Sample items (T-18) get
 // fresh ids on every run, since item ids are unique across a user's lists.
+//
+// With no templates, only the marker is written: "Start empty" after a
+// failed seeding (Q-27), so the starter lists never appear later.
 class StarterLists {
   static const String seededAtKey = 'starterSeededAt';
 

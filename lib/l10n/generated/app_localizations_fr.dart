@@ -835,4 +835,11 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get listChangeNotSaved =>
       'Une modification de liste n\'a pas pu être enregistrée et a été annulée.';
+
+  @override
+  String get starterListsFailed =>
+      'Les listes de départ n\'ont pas pu être créées.';
+
+  @override
+  String get startEmpty => 'Commencer sans listes';
 }
