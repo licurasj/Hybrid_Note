@@ -16,6 +16,7 @@ Future<FirestoreListStore> _pumpApp(
   WidgetTester tester,
   FakeAuthService auth, {
   Map<String, Object> preferences = const {},
+  VoidCallback? afterSignOut,
 }) async {
   tester.view.physicalSize = const Size(800, 1600);
   tester.view.devicePixelRatio = 1;
@@ -23,7 +24,13 @@ Future<FirestoreListStore> _pumpApp(
   SharedPreferences.setMockInitialValues(preferences);
 
   final FirestoreListStore store = await widgetTestStore(tester);
-  await tester.pumpWidget(await testApp(auth: auth, openStore: (_) => store));
+  await tester.pumpWidget(
+    await testApp(
+      auth: auth,
+      openStore: (_) => store,
+      afterSignOut: afterSignOut,
+    ),
+  );
   await settle(tester);
   return store;
 }
@@ -71,11 +78,39 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('sign-out')));
     await settle(tester);
-    expect(auth.calls, ['signIn', 'signOut']);
+    expect(auth.calls, ['signIn', 'signOut', 'clearCache']);
     expect(find.byKey(const ValueKey('sign-in')), findsOneWidget);
     expect(_hub, findsNothing);
     expect(find.text('Grocery List'), findsNothing);
     expect(find.text('owner@example.com'), findsNothing);
+  });
+
+  testWidgets('a failed cache clear keeps a retry state until it works', (
+    WidgetTester tester,
+  ) async {
+    final FakeAuthService auth = FakeAuthService(user: testUser)
+      ..cleanupResults.add(false);
+    int reloads = 0;
+    await _pumpApp(tester, auth, afterSignOut: () => reloads++);
+    final Finder signIn = find.byKey(const ValueKey('sign-in'));
+    bool signInEnabled() =>
+        tester.widget<ButtonStyleButton>(signIn).onPressed != null;
+
+    await tester.tap(find.byKey(const ValueKey('sign-out')));
+    await settle(tester);
+    // Signed out, but the lists are still on the device: no reload (on web)
+    // and no sign-in until they are deleted (T-17 R1).
+    expect(_hub, findsNothing);
+    expect(find.byKey(const ValueKey('cleanup-failed')), findsOneWidget);
+    expect(signInEnabled(), isFalse);
+    expect(reloads, 0);
+
+    await tester.tap(find.byKey(const ValueKey('retry-cleanup')));
+    await settle(tester);
+    expect(auth.calls, ['signOut', 'clearCache', 'clearCache']);
+    expect(find.byKey(const ValueKey('cleanup-failed')), findsNothing);
+    expect(signInEnabled(), isTrue);
+    expect(reloads, 1);
   });
 
   testWidgets('a sign-in failure shows a message and stays signed out', (

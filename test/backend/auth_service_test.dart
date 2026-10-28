@@ -359,7 +359,7 @@ void main() {
         clearCache: () async => calls.add('clearCache'),
       );
 
-      await service.signOut();
+      expect(await service.signOut(), isTrue);
 
       expect([...auth.calls, ...calls], [
         'firebase.signOut',
@@ -369,20 +369,29 @@ void main() {
       expect(service.currentUser, isNull);
     });
 
-    test('a failed cache clear does not stop the sign-out', () async {
+    test('a failed cache clear is reported, and clearing can be retried',
+        () async {
       final FakeFirebaseAuth auth = FakeFirebaseAuth(
         user: FakeUser('anon-uid', isAnonymous: true),
       );
+      int attempts = 0;
       final AuthService service = AuthService(
         auth: auth,
         usePopup: true,
-        clearCache: () async => throw StateError('terminated'),
+        clearCache: () async {
+          if (++attempts == 1) {
+            throw StateError('the database is open in another tab');
+          }
+        },
       );
 
-      await service.signOut();
-
+      // Signed out of Firebase, but the cache is still there (T-17 R1).
+      expect(await service.signOut(), isFalse);
       expect(auth.calls, ['firebase.signOut']);
       expect(service.currentUser, isNull);
+
+      expect(await service.clearLocalData(), isTrue);
+      expect(attempts, 2);
     });
   });
 }

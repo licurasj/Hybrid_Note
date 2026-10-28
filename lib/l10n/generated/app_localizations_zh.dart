@@ -815,4 +815,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get signOutFailed => '退出登录失败，请重试。';
+
+  @override
+  String get signOutCleanupFailed => '已退出登录，但无法删除保存在此设备上的列表。';
+
+  @override
+  String get tryAgain => '重试';
 }

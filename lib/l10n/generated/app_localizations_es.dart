@@ -823,4 +823,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get signOutFailed => 'No se pudo cerrar sesión. Inténtalo de nuevo.';
+
+  @override
+  String get signOutCleanupFailed =>
+      'Sesión cerrada, pero no se pudieron borrar las listas guardadas en este dispositivo.';
+
+  @override
+  String get tryAgain => 'Reintentar';
 }

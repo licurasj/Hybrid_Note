@@ -298,5 +298,7 @@
   "blankList": "En blanco",
   "signInFailed": "No se pudo iniciar sesión. Inténtalo de nuevo.",
   "signInOffline": "Sin conexión. Conéctate a internet para iniciar sesión.",
-  "signOutFailed": "No se pudo cerrar sesión. Inténtalo de nuevo."
+  "signOutFailed": "No se pudo cerrar sesión. Inténtalo de nuevo.",
+  "signOutCleanupFailed": "Sesión cerrada, pero no se pudieron borrar las listas guardadas en este dispositivo.",
+  "tryAgain": "Reintentar"
 }

@@ -6,10 +6,15 @@ import '../l10n/generated/app_localizations.dart';
 // The signed-out state (Q-21 A): the app name and "Sign in with Google",
 // nothing else. A successful sign-in reaches the gate through
 // AuthService.userChanges; failures show as a snackbar.
+//
+// After a sign-out whose cache clear failed, [onRetryCleanup] is set: a note
+// says the lists are still on this device, with "Try again", and sign-in
+// waits until the cache is cleared (T-17 R1).
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key, required this.auth});
+  const SignInScreen({super.key, required this.auth, this.onRetryCleanup});
 
   final AuthService auth;
+  final Future<void> Function()? onRetryCleanup;
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -17,6 +22,17 @@ class SignInScreen extends StatefulWidget {
 
 class _SignInScreenState extends State<SignInScreen> {
   bool _busy = false;
+
+  Future<void> _retryCleanup() async {
+    setState(() => _busy = true);
+    try {
+      await widget.onRetryCleanup!();
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
 
   Future<void> _signIn() async {
     final AppLocalizations loc = AppLocalizations.of(context);
@@ -59,9 +75,25 @@ class _SignInScreenState extends State<SignInScreen> {
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 32),
+                if (widget.onRetryCleanup != null) ...[
+                  Text(
+                    loc.signOutCleanupFailed,
+                    key: const ValueKey('cleanup-failed'),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    key: const ValueKey('retry-cleanup'),
+                    onPressed: _busy ? null : _retryCleanup,
+                    child: Text(loc.tryAgain),
+                  ),
+                  const SizedBox(height: 24),
+                ],
                 FilledButton.icon(
                   key: const ValueKey('sign-in'),
-                  onPressed: _busy ? null : _signIn,
+                  onPressed: _busy || widget.onRetryCleanup != null
+                      ? null
+                      : _signIn,
                   icon: const Icon(Icons.login),
                   label: Text(loc.signInWithGoogle),
                 ),

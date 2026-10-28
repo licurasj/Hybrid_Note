@@ -665,5 +665,7 @@
   "blankList": "Blank",
   "signInFailed": "Sign-in failed. Please try again.",
   "signInOffline": "No connection. Connect to the internet to sign in.",
-  "signOutFailed": "Sign-out failed. Please try again."
+  "signOutFailed": "Sign-out failed. Please try again.",
+  "signOutCleanupFailed": "Signed out, but the lists saved on this device could not be deleted.",
+  "tryAgain": "Try again"
 }

@@ -824,4 +824,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get signOutFailed => 'La déconnexion a échoué. Veuillez réessayer.';
+
+  @override
+  String get signOutCleanupFailed =>
+      'Déconnecté, mais les listes enregistrées sur cet appareil n\'ont pas pu être supprimées.';
+
+  @override
+  String get tryAgain => 'Réessayer';
 }

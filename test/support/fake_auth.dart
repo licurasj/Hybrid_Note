@@ -14,13 +14,15 @@ import 'firestore_store.dart';
 const AuthUser testUser = AuthUser(uid: testUid, email: 'owner@example.com');
 
 // AuthService without Firebase: [signInWithGoogle] signs in as [nextUser]
-// (or throws [signInError]); [calls] records what was called.
+// (or throws [signInError]); [calls] records what was called. Each cache
+// clear takes the next of [cleanupResults] (true once it is empty).
 class FakeAuthService implements AuthService {
   FakeAuthService({AuthUser? user, this.nextUser = testUser}) : _user = user;
 
   AuthUser? _user;
   AuthUser? nextUser;
   AuthException? signInError;
+  final List<bool> cleanupResults = [];
   final List<String> calls = [];
   final StreamController<AuthUser?> _changes =
       StreamController<AuthUser?>.broadcast();
@@ -56,9 +58,16 @@ class FakeAuthService implements AuthService {
   }
 
   @override
-  Future<void> signOut() async {
+  Future<bool> signOut() async {
     calls.add('signOut');
     emit(null);
+    return clearLocalData();
+  }
+
+  @override
+  Future<bool> clearLocalData() async {
+    calls.add('clearCache');
+    return cleanupResults.isEmpty ? true : cleanupResults.removeAt(0);
   }
 }
 
@@ -67,10 +76,15 @@ class FakeAuthService implements AuthService {
 Future<Widget> testApp({
   required FakeAuthService auth,
   required FirestoreListStore Function(AuthUser user) openStore,
+  VoidCallback? afterSignOut,
 }) async {
   final SharedPreferences preferences = await SharedPreferences.getInstance();
   return BlocProvider(
     create: (_) => AppSettingsCubit(preferences),
-    child: HybridNoteApp(auth: auth, openStore: openStore),
+    child: HybridNoteApp(
+      auth: auth,
+      openStore: openStore,
+      afterSignOut: afterSignOut,
+    ),
   );
 }

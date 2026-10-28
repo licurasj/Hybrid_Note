@@ -817,4 +817,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get signOutFailed => 'サインアウトに失敗しました。もう一度お試しください。';
+
+  @override
+  String get signOutCleanupFailed => 'サインアウトしましたが、この端末に保存されたリストを削除できませんでした。';
+
+  @override
+  String get tryAgain => '再試行';
 }

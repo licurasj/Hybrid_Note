@@ -822,4 +822,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signOutFailed => 'Sign-out failed. Please try again.';
+
+  @override
+  String get signOutCleanupFailed =>
+      'Signed out, but the lists saved on this device could not be deleted.';
+
+  @override
+  String get tryAgain => 'Try again';
 }

@@ -141,10 +141,14 @@ class AuthService {
   }
 
   // Signs out of Firebase and, on Android, of the Google account (so the
-  // sheet asks again), then clears the cache. Sign-out itself only fails on
-  // a broken plugin; a failed Google sign-out or cache clear is logged and
-  // does not stop it.
-  Future<void> signOut() async {
+  // sheet asks again), then clears the cache. Throws only when the Firebase
+  // sign-out fails (a broken plugin): the user is then still signed in. A
+  // failed Google sign-out is logged and does not stop it.
+  //
+  // Returns whether the cache was cleared. False means the user is signed
+  // out but the previous account's data is still on the device; the caller
+  // keeps that state and calls [clearLocalData] again (T-17 R1).
+  Future<bool> signOut() async {
     await _auth.signOut();
     if (!_usePopup) {
       try {
@@ -153,12 +157,21 @@ class AuthService {
         debugPrint('AuthService: Google sign-out failed: $error');
       }
     }
-    if (clearCache != null) {
-      try {
-        await clearCache!();
-      } on Object catch (error) {
-        debugPrint('AuthService: clearing the cache failed: $error');
-      }
+    return clearLocalData();
+  }
+
+  // Deletes the local Firestore cache (Q-25 A); true when it is gone (or
+  // there is none to clear).
+  Future<bool> clearLocalData() async {
+    if (clearCache == null) {
+      return true;
+    }
+    try {
+      await clearCache!();
+      return true;
+    } on Object catch (error) {
+      debugPrint('AuthService: clearing the cache failed: $error');
+      return false;
     }
   }
 

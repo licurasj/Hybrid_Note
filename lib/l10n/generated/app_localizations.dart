@@ -1519,6 +1519,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign-out failed. Please try again.'**
   String get signOutFailed;
+
+  /// No description provided for @signOutCleanupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed out, but the lists saved on this device could not be deleted.'**
+  String get signOutCleanupFailed;
+
+  /// No description provided for @tryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get tryAgain;
 }
 
 class _AppLocalizationsDelegate

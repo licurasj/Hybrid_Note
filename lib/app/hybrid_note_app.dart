@@ -40,8 +40,9 @@ class HybridNoteApp extends StatefulWidget {
 
   final AuthService auth;
   final StoreOpener openStore;
-  // Runs once sign-out has finished; on web it reloads the page, since the
-  // cleared Firestore instance cannot be used again (FirestoreSetup).
+  // Runs once sign-out has finished and the cache is cleared; on web it
+  // reloads the page, since the cleared Firestore instance cannot be used
+  // again (FirestoreSetup). It does not run while the cache is still there.
   final VoidCallback? afterSignOut;
 
   @override
@@ -57,6 +58,9 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
   bool _known = false;
   AuthUser? _user;
   FirestoreListStore? _store;
+  // Signed out, but the previous account's cache could not be cleared: the
+  // sign-in screen says so and offers to try again (T-17 R1, Q-25 A).
+  bool _cleanupFailed = false;
 
   @override
   void initState() {
@@ -94,9 +98,10 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
       _user = null;
       _store = null;
     });
+    final bool cleared;
     try {
       await store?.close();
-      await widget.auth.signOut();
+      cleared = await widget.auth.signOut();
     } on Object catch (error) {
       debugPrint('Sign-out failed: $error');
       final BuildContext? context = _messenger.currentContext;
@@ -111,7 +116,22 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
       }
       return;
     }
-    widget.afterSignOut?.call();
+    _afterCleanup(cleared);
+  }
+
+  Future<void> _retryCleanup() async {
+    _afterCleanup(await widget.auth.clearLocalData());
+  }
+
+  // Signed out either way; only a cleared cache counts as done.
+  void _afterCleanup(bool cleared) {
+    if (!mounted) {
+      return;
+    }
+    setState(() => _cleanupFailed = !cleared);
+    if (cleared) {
+      widget.afterSignOut?.call();
+    }
   }
 
   @override
@@ -122,7 +142,10 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
     if (!_known) {
       home = const Scaffold();
     } else if (user == null || store == null) {
-      home = SignInScreen(auth: widget.auth);
+      home = SignInScreen(
+        auth: widget.auth,
+        onRetryCleanup: _cleanupFailed ? _retryCleanup : null,
+      );
     } else {
       home = const MainShell();
     }

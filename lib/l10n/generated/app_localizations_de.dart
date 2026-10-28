@@ -826,4 +826,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get signOutFailed =>
       'Abmeldung fehlgeschlagen. Bitte erneut versuchen.';
+
+  @override
+  String get signOutCleanupFailed =>
+      'Abgemeldet, aber die auf diesem Gerät gespeicherten Listen konnten nicht gelöscht werden.';
+
+  @override
+  String get tryAgain => 'Erneut versuchen';
 }
