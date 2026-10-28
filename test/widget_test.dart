@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hybrid_note/app_cubit.dart';
 import 'package:hybrid_note/lists/custom_lists.dart';
 import 'package:hybrid_note/lists/local_list_store.dart';
-import 'package:hybrid_note/main.dart';
+import 'package:hybrid_note/app/hybrid_note_app.dart';
 
 import 'support/fakes.dart';
 
