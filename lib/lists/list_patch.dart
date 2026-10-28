@@ -330,9 +330,12 @@ class ListPatch {
           return (true, text.split(',').map((tag) => tag.trim()).where((tag) => tag.isNotEmpty).toList());
         }
         return (false, null);
+      // The two structured types have different shapes: a checklist is a list
+      // of sub-items, a recurrence a {frequency, ...} map.
       case FieldType.checklist:
+        return value is List ? (true, value) : (false, null);
       case FieldType.recurrence:
-        return value is List || value is Map ? (true, value) : (false, null);
+        return value is Map ? (true, value) : (false, null);
     }
   }
 

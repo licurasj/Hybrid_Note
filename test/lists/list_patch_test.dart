@@ -76,6 +76,41 @@ void main() {
     expect(result.items[0].validateAgainst(result.definition), isEmpty);
   });
 
+  test('checklist and recurrence do not take each other\'s values', () {
+    ListDefinition plan(String type) => ListDefinition.fromJson({
+          ..._books().toJson(),
+          'fields': [
+            {'key': 'title', 'type': 'text', 'label': 'Title', 'required': true, 'primary': true},
+            {'key': 'plan', 'type': type, 'label': 'Plan'},
+          ],
+        });
+    const Map<String, dynamic> weekly = {'frequency': 'weekly'};
+    final List<Map<String, dynamic>> steps = [
+      {'id': 's1', 'title': 'Step', 'done': false, 'createdAt': _t0.toIso8601String(), 'updatedAt': _t0.toIso8601String()},
+    ];
+
+    final ListPatchResult toChecklist = ListPatch.apply(plan('recurrence'), [
+      _item('a', {'plan': weekly}),
+    ], const [
+      ListPatchOp(PatchOpKind.changeFieldType, {'key': 'plan', 'type': 'checklist'}),
+    ], _t1);
+    expect(toChecklist.isValid, isTrue);
+    expect(toChecklist.hiddenValues, 1);
+    expect(toChecklist.items.single['plan'], isNull);
+    expect(toChecklist.items.single['_legacy'], {'plan': weekly});
+    expect(toChecklist.items.single.validateAgainst(toChecklist.definition), isEmpty);
+
+    final ListPatchResult toRecurrence = ListPatch.apply(plan('checklist'), [
+      _item('a', {'plan': steps}),
+    ], const [
+      ListPatchOp(PatchOpKind.changeFieldType, {'key': 'plan', 'type': 'recurrence'}),
+    ], _t1);
+    expect(toRecurrence.hiddenValues, 1);
+    expect(toRecurrence.items.single['plan'], isNull);
+    expect(toRecurrence.items.single['_legacy'], {'plan': steps});
+    expect(toRecurrence.items.single.validateAgainst(toRecurrence.definition), isEmpty);
+  });
+
   test('add, rename, move and set view build a valid definition', () {
     final ListPatchResult result = ListPatch.apply(_books(), items, const [
       ListPatchOp(PatchOpKind.setListInfo, {'name': 'Reading', 'color': '#654321'}),
