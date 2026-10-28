@@ -6,12 +6,18 @@ import 'app_state.dart';
 import 'app_storage.dart';
 import 'drive_sync_service.dart';
 import 'home_screen.dart';
-import 'journal_screen.dart';
-import 'todo_screen.dart';
-import 'watchlist_screen.dart';
-import 'grocery_screen.dart';
 import 'app_colors.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'launcher/radial_launcher.dart';
+import 'lists/builtin_templates.dart';
+import 'lists/generic_list_host.dart';
+import 'lists/custom_lists.dart';
+import 'lists/list_catalog.dart';
+import 'lists/list_definition.dart';
+import 'lists/list_editor_screen.dart';
+import 'lists/list_icons.dart';
+import 'lists/list_labels.dart';
+import 'lists/list_patch.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,12 +26,19 @@ Future<void> main() async {
   final String deviceId = await storage.getOrCreateDeviceId();
 
   runApp(
-    BlocProvider(
-      create: (_) => AppCubit(
-        storage: storage,
-        driveSyncService: DriveSyncService(),
-        deviceId: deviceId,
-      )..loadData(),
+    MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => AppCubit(
+            storage: storage,
+            driveSyncService: DriveSyncService(),
+            deviceId: deviceId,
+          )..loadData(),
+        ),
+        BlocProvider(
+          create: (_) => CustomListsCubit(CustomListsStorage())..load(),
+        ),
+      ],
       child: const HybridNoteApp(),
     ),
   );
@@ -260,28 +273,161 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int selectedIndex = 0;
+  // Lists in the order they were last opened, newest first, so the common
+  // case never needs scrolling (plan 5.3). Kept in memory for now.
+  final List<String> _recent = [];
 
-  void _selectPage(int index) {
+  static const List<String> _homeTargets = [
+    BuiltinTemplates.tasksId,
+    BuiltinTemplates.groceryId,
+    BuiltinTemplates.journalId,
+    BuiltinTemplates.watchReadId,
+  ];
+
+  void _openList(String listId) {
     setState(() {
-      selectedIndex = index;
+      _recent
+        ..remove(listId)
+        ..insert(0, listId);
     });
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => GenericListHost(listId: listId),
+      ),
+    );
   }
 
-  Widget _screenForIndex(int index) {
-    switch (index) {
-      case 1:
-        return const TodoScreen();
-      case 2:
-        return const GroceryScreen();
-      case 3:
-        return const JournalScreen();
-      case 4:
-        return const WatchlistScreen();
-      case 0:
-      default:
-        return HomeScreen(onNavigate: _selectPage);
+  // Home dashboard cards use the old tab numbers: 1 tasks, 2 grocery,
+  // 3 journal, 4 watch/read.
+  void _openFromHome(int index) {
+    if (index >= 1 && index <= _homeTargets.length) {
+      _openList(_homeTargets[index - 1]);
     }
+  }
+
+  List<LauncherNote> _notes(AppLocalizations loc, ListCatalog catalog) {
+    final ListLabels labels = ListLabels(loc);
+    final List<ListDefinition> ordered = [...catalog.definitions]
+      ..sort((a, b) {
+        int rank(ListDefinition definition) {
+          final int index = _recent.indexOf(definition.id);
+          return index < 0
+              ? _recent.length + catalog.definitions.indexOf(definition)
+              : index;
+        }
+
+        return rank(a).compareTo(rank(b));
+      });
+
+    return [
+      for (final ListDefinition definition in ordered)
+        LauncherNote(
+          id: definition.id,
+          label: labels.listName(definition),
+          icon: listIcon(definition.icon),
+          color: listColor(definition.color),
+          semanticsLabel: loc.itemsCount(
+            labels.listName(definition),
+            catalog.itemsOf(definition.id).length,
+          ),
+        ),
+    ];
+  }
+
+  ListCatalog _catalog() {
+    return ListCatalog.from(
+      context.read<AppCubit>().state,
+      context.read<CustomListsCubit>().state,
+    );
+  }
+
+  Future<void> _newList() async {
+    final AppLocalizations loc = AppLocalizations.of(context);
+    final ListEditorOutcome? outcome = await Navigator.of(context).push(
+      MaterialPageRoute<ListEditorOutcome>(
+        builder: (_) => ListEditorScreen(
+          definition: blankListDefinition(loc),
+          isNew: true,
+        ),
+      ),
+    );
+    final ListPatchResult? result = outcome?.result;
+    if (!mounted || result == null || !result.isValid) {
+      return;
+    }
+
+    await context.read<CustomListsCubit>().createList(result.definition);
+    if (mounted) {
+      _openList(result.definition.id);
+    }
+  }
+
+  Future<void> _editList(String listId) async {
+    final ListCatalog catalog = _catalog();
+    final ListDefinition? definition = catalog.definition(listId);
+    if (definition == null) {
+      return;
+    }
+
+    final ListEditorOutcome? outcome = await Navigator.of(context).push(
+      MaterialPageRoute<ListEditorOutcome>(
+        builder: (_) => ListEditorScreen(
+          definition: definition,
+          items: catalog.itemsOf(listId),
+        ),
+      ),
+    );
+    if (!mounted || outcome == null) {
+      return;
+    }
+
+    final CustomListsCubit custom = context.read<CustomListsCubit>();
+    if (outcome.deleted) {
+      await _deleteList(listId);
+      return;
+    }
+
+    // Re-apply the ops to the current items, in case they changed meanwhile.
+    final ListCatalog fresh = _catalog();
+    final ListDefinition? current = fresh.definition(listId);
+    if (current == null) {
+      return;
+    }
+    final ListPatchResult result = ListPatch.apply(
+      current,
+      fresh.itemsOf(listId),
+      outcome.ops,
+      DateTime.now().toUtc(),
+    );
+    if (result.isValid) {
+      await custom.savePatched(result, outcome.ops);
+    }
+  }
+
+  // Deleting is immediate, with Undo in a snackbar and no trash bin (D-5).
+  Future<void> _deleteList(String listId) async {
+    final AppLocalizations loc = AppLocalizations.of(context);
+    final CustomListsCubit custom = context.read<CustomListsCubit>();
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final DeletedList? deleted = await custom.deleteList(listId);
+    if (deleted == null) {
+      return;
+    }
+
+    setState(() => _recent.remove(listId));
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(loc.listDeleted),
+        // A snackbar with an action stays until dismissed unless told
+        // otherwise; Undo is only offered for a short while.
+        persist: false,
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: loc.undo,
+          onPressed: () => custom.restoreList(deleted),
+        ),
+      ),
+    );
   }
 
   @override
@@ -301,37 +447,39 @@ class _MainShellState extends State<MainShell> {
         }
       },
       child: Scaffold(
-        body: _screenForIndex(selectedIndex),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: _selectPage,
-          destinations: [
-            NavigationDestination(
-              icon: const Icon(Icons.dashboard_outlined),
-              selectedIcon: const Icon(Icons.dashboard),
-              label: AppLocalizations.of(context).home,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.check_box_outlined),
-              selectedIcon: const Icon(Icons.check_box),
-              label: AppLocalizations.of(context).tasks,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.shopping_cart_outlined),
-              selectedIcon: const Icon(Icons.shopping_cart),
-              label: AppLocalizations.of(context).grocery,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.book_outlined),
-              selectedIcon: const Icon(Icons.book),
-              label: AppLocalizations.of(context).journal,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.movie_outlined),
-              selectedIcon: const Icon(Icons.movie),
-              label: AppLocalizations.of(context).watchRead,
-            ),
-          ],
+        body: BlocBuilder<CustomListsCubit, CustomListsData>(
+          builder: (context, custom) => BlocBuilder<AppCubit, AppState>(
+          builder: (context, state) {
+            final AppLocalizations loc = AppLocalizations.of(context);
+            final ListCatalog catalog = ListCatalog.from(state, custom);
+            return Stack(
+              children: [
+                // Room below the dashboard so the hub never covers it.
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 88),
+                  child: HomeScreen(onNavigate: _openFromHome),
+                ),
+                Positioned.fill(
+                  child: RadialLauncher(
+                    notes: _notes(loc, catalog),
+                    onOpen: (note) => _openList(note.id),
+                    onEdit: (note) => _editList(note.id),
+                    onNew: _newList,
+                    hubTooltip: loc.launcherHub,
+                    editLabel: loc.edit,
+                    moveLabel: loc.moveHub,
+                    addLabel: loc.newList,
+                    previousLabel: loc.previous,
+                    nextLabel: loc.next,
+                    noteHint: loc.launcherNoteHint,
+                    hubPosition: state.hubPosition,
+                    onHubMoved: context.read<AppCubit>().setHubPosition,
+                  ),
+                ),
+              ],
+            );
+          },
+          ),
         ),
       ),
     );

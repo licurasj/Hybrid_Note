@@ -369,4 +369,180 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get noWatchReadItemsYet => 'No watch/read items yet.';
+
+  @override
+  String get editList => 'リストを編集';
+
+  @override
+  String get newList => '新しいリスト';
+
+  @override
+  String get untitledList => '無題のリスト';
+
+  @override
+  String get listName => 'リスト名';
+
+  @override
+  String get listIcon => 'アイコン';
+
+  @override
+  String get listColor => '色';
+
+  @override
+  String get fields => '項目';
+
+  @override
+  String get addField => '項目を追加';
+
+  @override
+  String get fieldName => '項目名';
+
+  @override
+  String get fieldType => '項目の種類';
+
+  @override
+  String get required => '必須';
+
+  @override
+  String get options => '選択肢';
+
+  @override
+  String get addOption => '選択肢を追加';
+
+  @override
+  String get layout => 'レイアウト';
+
+  @override
+  String get groupBy => 'グループ化';
+
+  @override
+  String get sectionBy => 'セクション';
+
+  @override
+  String get dateField => '日付の項目';
+
+  @override
+  String get splitByDate => '今日 / 明日 / 後で の基準';
+
+  @override
+  String get filterBy => '絞り込み';
+
+  @override
+  String get none => 'なし';
+
+  @override
+  String get dateCreated => '作成日';
+
+  @override
+  String get rules => 'ルール';
+
+  @override
+  String get ruleClearCompleted => '完了した項目を消去';
+
+  @override
+  String get ruleRecurOnClear => '消去時に繰り返す';
+
+  @override
+  String get ruleCopyOnClear => '消去時にコピー';
+
+  @override
+  String get ruleMoveAll => 'すべて移動ボタン';
+
+  @override
+  String get allowAi => 'AIがこのリストを読むことを許可';
+
+  @override
+  String get deleteList => 'リストを削除';
+
+  @override
+  String get listDeleted => 'リストを削除しました';
+
+  @override
+  String get undo => '元に戻す';
+
+  @override
+  String get builtinListNote =>
+      '組み込みリストの項目は Firestore への移行まで変更できません。名前・アイコン・色は変更できます。';
+
+  @override
+  String get localOnlyNote => '新しいリストは Firestore への移行まで、この端末にのみ保存されます。';
+
+  @override
+  String get typeText => 'テキスト';
+
+  @override
+  String get typeLongText => '長いテキスト';
+
+  @override
+  String get typeCheckbox => 'チェックボックス';
+
+  @override
+  String get typeToggle => 'スイッチ';
+
+  @override
+  String get typeNumber => '数値';
+
+  @override
+  String get typeCounter => 'カウンター';
+
+  @override
+  String get typeRating => '評価';
+
+  @override
+  String get typeDateTime => '日時';
+
+  @override
+  String get typeChoice => '選択';
+
+  @override
+  String get typeTags => 'タグ';
+
+  @override
+  String get typeUrl => 'リンク';
+
+  @override
+  String get typeChecklist => 'サブ項目';
+
+  @override
+  String get viewChecklist => 'チェックリスト';
+
+  @override
+  String get viewSectioned => 'セクション';
+
+  @override
+  String get viewTimeline => 'タイムライン';
+
+  @override
+  String get viewGrouped => 'グループ';
+
+  @override
+  String get viewTable => '表';
+
+  @override
+  String get viewCards => 'カード';
+
+  @override
+  String get launcherHub => 'リスト';
+
+  @override
+  String get previous => '前へ';
+
+  @override
+  String get next => '次へ';
+
+  @override
+  String get launcherNoteHint => 'ダブルタップで開く、長押しで編集';
+
+  @override
+  String hiddenValuesWarning(int count) {
+    return '$count 件の値は新しい種類に合わないため、非表示で保持されます';
+  }
+
+  @override
+  String itemsCount(String name, int count) {
+    return '$name、$count 件';
+  }
+
+  @override
+  String get moveHub => '移動';
 }

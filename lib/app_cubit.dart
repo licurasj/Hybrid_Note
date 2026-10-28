@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
@@ -7,6 +9,10 @@ import 'app_storage.dart';
 import 'drive_sync_service.dart';
 import 'grocery_item.dart';
 import 'journal_entry.dart';
+import 'lists/builtin_templates.dart';
+import 'lists/legacy_lists.dart';
+import 'lists/list_item.dart';
+import 'lists/list_rules.dart';
 import 'sync_result.dart';
 import 'task_item.dart';
 import 'watch_item.dart';
@@ -35,6 +41,11 @@ class AppCubit extends Cubit<AppState> {
         clearSelectedLocale: localeCode == null,
       ),
     );
+  }
+
+  Future<void> setHubPosition(Offset position) async {
+    emit(state.copyWith(hubPosition: position));
+    await storage.saveHubPosition(position);
   }
 
   void _clearSyncMessageSoon(
@@ -85,6 +96,7 @@ class AppCubit extends Cubit<AppState> {
     try {
       final AppData loadedData = await storage.loadAppData();
       final String? preferredLocaleCode = await storage.loadPreferredLocaleCode();
+      final Offset? hubPosition = await storage.loadHubPosition();
 
       emit(
         state.copyWith(
@@ -94,6 +106,7 @@ class AppCubit extends Cubit<AppState> {
           isGoogleSignedIn: driveSyncService.isSignedIn,
           selectedLocaleCode: preferredLocaleCode,
           clearSelectedLocale: preferredLocaleCode == null,
+          hubPosition: hubPosition,
           clearError: true,
         ),
       );
@@ -1521,6 +1534,139 @@ class AppCubit extends Cubit<AppState> {
 
     await _updateAndSave(
       state.data.copyWith(groceryItems: updatedItems),
+    );
+  }
+
+  // Applies changes from the generic list screens (lib/lists) to the v2 data:
+  // upserts items, deletes with tombstones, records removed sub-items and new
+  // task categories, as the per-list methods above do.
+  Future<void> applyListChanges(ListChanges changes) async {
+    if (changes.isEmpty) {
+      return;
+    }
+
+    final DateTime now = DateTime.now().toUtc();
+    final AppData data = state.data;
+    final Set<String> deleted = changes.deletedIds.toSet();
+
+    List<SyncTombstone> tombstonesFor(
+      List<SyncTombstone> tombstones,
+      Iterable<String> currentIds,
+    ) {
+      List<SyncTombstone> output = tombstones;
+      for (final String id in currentIds.where(deleted.contains)) {
+        output = _upsertTombstone(output, _makeTombstone(id, now));
+      }
+      return output;
+    }
+
+    List<T> merge<T>(
+      List<T> current,
+      String listId,
+      String Function(T item) idOf,
+      T Function(ListItem item) convert,
+    ) {
+      final Map<String, ListItem> saved = {
+        for (final ListItem item in changes.saved)
+          if (item.listId == listId) item.id: item,
+      };
+      final List<T> output = [];
+
+      for (final T existing in current) {
+        final String id = idOf(existing);
+        if (deleted.contains(id)) {
+          continue;
+        }
+        final ListItem? replacement = saved.remove(id);
+        output.add(replacement == null ? existing : convert(replacement));
+      }
+
+      output.addAll(saved.values.map(convert));
+      return output;
+    }
+
+    final List<TaskItem> tasks = merge(
+      data.tasks,
+      BuiltinTemplates.tasksId,
+      (task) => task.id,
+      LegacyLists.itemToTask,
+    );
+
+    // Sub-items that disappeared from a task that is still there.
+    List<SyncTombstone> subtaskTombstones = data.subtaskTombstones;
+    for (final TaskItem task in tasks) {
+      final TaskItem? before = data.tasks.where((old) => old.id == task.id).firstOrNull;
+      if (before == null) {
+        continue;
+      }
+      final Set<String> kept = task.subtasks.map((subtask) => subtask.id).toSet();
+      for (final SubtaskItem subtask in before.subtasks) {
+        if (!kept.contains(subtask.id)) {
+          subtaskTombstones = _upsertTombstone(
+            subtaskTombstones,
+            _makeTombstone(subtask.id, now),
+          );
+        }
+      }
+    }
+
+    // Categories typed while editing a task become real categories.
+    List<String> categories = data.categories;
+    List<SyncTombstone> categoryTombstones = data.categoryTombstones;
+    for (final TaskItem task in tasks) {
+      final String category = task.category.trim();
+      if (category.isNotEmpty &&
+          category != AppData.defaultCategory &&
+          !categories.any((other) => other.toLowerCase() == category.toLowerCase())) {
+        categories = [...categories, category];
+        categoryTombstones = _removeTombstone(
+          categoryTombstones,
+          _categoryTombstoneId(category),
+        );
+      }
+    }
+
+    await _updateAndSave(
+      data.copyWith(
+        tasks: tasks,
+        groceryItems: merge(
+          data.groceryItems,
+          BuiltinTemplates.groceryId,
+          (item) => item.id,
+          LegacyLists.itemToGrocery,
+        ),
+        journalEntries: merge(
+          data.journalEntries,
+          BuiltinTemplates.journalId,
+          (entry) => entry.id,
+          LegacyLists.itemToJournal,
+        ),
+        watchItems: merge(
+          data.watchItems,
+          BuiltinTemplates.watchReadId,
+          (item) => item.id,
+          LegacyLists.itemToWatch,
+        ),
+        categories: categories,
+        categoryTombstones: categoryTombstones,
+        subtaskTombstones: subtaskTombstones,
+        taskTombstones: tombstonesFor(
+          data.taskTombstones,
+          data.tasks.map((task) => task.id),
+        ),
+        groceryTombstones: tombstonesFor(
+          data.groceryTombstones,
+          data.groceryItems.map((item) => item.id),
+        ),
+        journalTombstones: tombstonesFor(
+          data.journalTombstones,
+          data.journalEntries.map((entry) => entry.id),
+        ),
+        watchTombstones: tombstonesFor(
+          data.watchTombstones,
+          data.watchItems.map((item) => item.id),
+        ),
+      ),
     );
   }
 }

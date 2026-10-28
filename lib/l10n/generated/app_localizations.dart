@@ -795,6 +795,348 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No watch/read items yet.'**
   String get noWatchReadItemsYet;
+
+  /// No description provided for @editList.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit list'**
+  String get editList;
+
+  /// No description provided for @newList.
+  ///
+  /// In en, this message translates to:
+  /// **'New list'**
+  String get newList;
+
+  /// No description provided for @untitledList.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled list'**
+  String get untitledList;
+
+  /// No description provided for @listName.
+  ///
+  /// In en, this message translates to:
+  /// **'List name'**
+  String get listName;
+
+  /// No description provided for @listIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon'**
+  String get listIcon;
+
+  /// No description provided for @listColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get listColor;
+
+  /// No description provided for @fields.
+  ///
+  /// In en, this message translates to:
+  /// **'Fields'**
+  String get fields;
+
+  /// No description provided for @addField.
+  ///
+  /// In en, this message translates to:
+  /// **'Add field'**
+  String get addField;
+
+  /// No description provided for @fieldName.
+  ///
+  /// In en, this message translates to:
+  /// **'Field name'**
+  String get fieldName;
+
+  /// No description provided for @fieldType.
+  ///
+  /// In en, this message translates to:
+  /// **'Field type'**
+  String get fieldType;
+
+  /// No description provided for @required.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get required;
+
+  /// No description provided for @options.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get options;
+
+  /// No description provided for @addOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Add option'**
+  String get addOption;
+
+  /// No description provided for @layout.
+  ///
+  /// In en, this message translates to:
+  /// **'Layout'**
+  String get layout;
+
+  /// No description provided for @groupBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Group by'**
+  String get groupBy;
+
+  /// No description provided for @sectionBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Sections by'**
+  String get sectionBy;
+
+  /// No description provided for @dateField.
+  ///
+  /// In en, this message translates to:
+  /// **'Date field'**
+  String get dateField;
+
+  /// No description provided for @splitByDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Today / Tomorrow / Later by'**
+  String get splitByDate;
+
+  /// No description provided for @filterBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter chips by'**
+  String get filterBy;
+
+  /// No description provided for @none.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get none;
+
+  /// No description provided for @dateCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Date created'**
+  String get dateCreated;
+
+  /// No description provided for @rules.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules'**
+  String get rules;
+
+  /// No description provided for @ruleClearCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear completed items'**
+  String get ruleClearCompleted;
+
+  /// No description provided for @ruleRecurOnClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat when cleared'**
+  String get ruleRecurOnClear;
+
+  /// No description provided for @ruleCopyOnClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy when cleared'**
+  String get ruleCopyOnClear;
+
+  /// No description provided for @ruleMoveAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Move all button'**
+  String get ruleMoveAll;
+
+  /// No description provided for @allowAi.
+  ///
+  /// In en, this message translates to:
+  /// **'AI may read this list'**
+  String get allowAi;
+
+  /// No description provided for @deleteList.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete list'**
+  String get deleteList;
+
+  /// No description provided for @listDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'List deleted'**
+  String get listDeleted;
+
+  /// No description provided for @undo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undo;
+
+  /// No description provided for @builtinListNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in lists keep their fields until sync moves to Firestore. You can change the name, icon and color.'**
+  String get builtinListNote;
+
+  /// No description provided for @localOnlyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'New lists are saved on this device only until sync moves to Firestore.'**
+  String get localOnlyNote;
+
+  /// No description provided for @typeText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get typeText;
+
+  /// No description provided for @typeLongText.
+  ///
+  /// In en, this message translates to:
+  /// **'Long text'**
+  String get typeLongText;
+
+  /// No description provided for @typeCheckbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkbox'**
+  String get typeCheckbox;
+
+  /// No description provided for @typeToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch'**
+  String get typeToggle;
+
+  /// No description provided for @typeNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Number'**
+  String get typeNumber;
+
+  /// No description provided for @typeCounter.
+  ///
+  /// In en, this message translates to:
+  /// **'Counter'**
+  String get typeCounter;
+
+  /// No description provided for @typeRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get typeRating;
+
+  /// No description provided for @typeDateTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Date and time'**
+  String get typeDateTime;
+
+  /// No description provided for @typeChoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Choice'**
+  String get typeChoice;
+
+  /// No description provided for @typeTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get typeTags;
+
+  /// No description provided for @typeUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Link'**
+  String get typeUrl;
+
+  /// No description provided for @typeChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Sub-items'**
+  String get typeChecklist;
+
+  /// No description provided for @viewChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Checklist'**
+  String get viewChecklist;
+
+  /// No description provided for @viewSectioned.
+  ///
+  /// In en, this message translates to:
+  /// **'Sections'**
+  String get viewSectioned;
+
+  /// No description provided for @viewTimeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeline'**
+  String get viewTimeline;
+
+  /// No description provided for @viewGrouped.
+  ///
+  /// In en, this message translates to:
+  /// **'Groups'**
+  String get viewGrouped;
+
+  /// No description provided for @viewTable.
+  ///
+  /// In en, this message translates to:
+  /// **'Table'**
+  String get viewTable;
+
+  /// No description provided for @viewCards.
+  ///
+  /// In en, this message translates to:
+  /// **'Cards'**
+  String get viewCards;
+
+  /// No description provided for @launcherHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Lists'**
+  String get launcherHub;
+
+  /// No description provided for @previous.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get previous;
+
+  /// No description provided for @next.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get next;
+
+  /// No description provided for @launcherNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-tap to open, long-press to edit'**
+  String get launcherNoteHint;
+
+  /// No description provided for @hiddenValuesWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} values do not fit the new type and will be kept hidden'**
+  String hiddenValuesWarning(int count);
+
+  /// No description provided for @itemsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}, {count} items'**
+  String itemsCount(String name, int count);
+
+  /// No description provided for @moveHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get moveHub;
 }
 
 class _AppLocalizationsDelegate

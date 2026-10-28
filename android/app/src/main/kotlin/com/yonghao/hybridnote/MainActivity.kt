@@ -1,4 +1,4 @@
-package com.example.lucas_tac368_project
+package com.yonghao.hybridnote
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'app_data.dart';
 
 class AppState {
@@ -10,6 +12,8 @@ class AppState {
   final String? syncMessage;
   final DateTime? lastSyncedAt;
   final String? selectedLocaleCode;
+  // Launcher hub position as fractions of the screen; null = default corner.
+  final Offset? hubPosition;
 
   const AppState({
     required this.data,
@@ -21,6 +25,7 @@ class AppState {
     this.syncMessage,
     this.lastSyncedAt,
     this.selectedLocaleCode,
+    this.hubPosition,
   });
 
   factory AppState.initial(String deviceId) {
@@ -40,6 +45,7 @@ class AppState {
     bool? isGoogleSignedIn,
     bool? isDarkMode,
     String? selectedLocaleCode,
+    Offset? hubPosition,
     String? errorMessage,
     String? syncMessage,
     DateTime? lastSyncedAt,
@@ -59,6 +65,7 @@ class AppState {
       selectedLocaleCode: clearSelectedLocale
           ? null
           : selectedLocaleCode ?? this.selectedLocaleCode,
+      hubPosition: hubPosition ?? this.hubPosition,
     );
   }
 

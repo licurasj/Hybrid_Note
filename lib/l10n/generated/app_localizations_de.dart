@@ -369,4 +369,182 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noWatchReadItemsYet => 'No watch/read items yet.';
+
+  @override
+  String get editList => 'Liste bearbeiten';
+
+  @override
+  String get newList => 'Neue Liste';
+
+  @override
+  String get untitledList => 'Unbenannte Liste';
+
+  @override
+  String get listName => 'Listenname';
+
+  @override
+  String get listIcon => 'Symbol';
+
+  @override
+  String get listColor => 'Farbe';
+
+  @override
+  String get fields => 'Felder';
+
+  @override
+  String get addField => 'Feld hinzufügen';
+
+  @override
+  String get fieldName => 'Feldname';
+
+  @override
+  String get fieldType => 'Feldtyp';
+
+  @override
+  String get required => 'Pflichtfeld';
+
+  @override
+  String get options => 'Optionen';
+
+  @override
+  String get addOption => 'Option hinzufügen';
+
+  @override
+  String get layout => 'Darstellung';
+
+  @override
+  String get groupBy => 'Gruppieren nach';
+
+  @override
+  String get sectionBy => 'Abschnitte nach';
+
+  @override
+  String get dateField => 'Datumsfeld';
+
+  @override
+  String get splitByDate => 'Heute / Morgen / Später nach';
+
+  @override
+  String get filterBy => 'Filter nach';
+
+  @override
+  String get none => 'Keine';
+
+  @override
+  String get dateCreated => 'Erstellungsdatum';
+
+  @override
+  String get rules => 'Regeln';
+
+  @override
+  String get ruleClearCompleted => 'Erledigte entfernen';
+
+  @override
+  String get ruleRecurOnClear => 'Beim Entfernen wiederholen';
+
+  @override
+  String get ruleCopyOnClear => 'Beim Entfernen kopieren';
+
+  @override
+  String get ruleMoveAll => 'Alle verschieben';
+
+  @override
+  String get allowAi => 'KI darf diese Liste lesen';
+
+  @override
+  String get deleteList => 'Liste löschen';
+
+  @override
+  String get listDeleted => 'Liste gelöscht';
+
+  @override
+  String get undo => 'Rückgängig';
+
+  @override
+  String get builtinListNote =>
+      'Integrierte Listen behalten ihre Felder bis zum Umzug nach Firestore. Name, Symbol und Farbe lassen sich ändern.';
+
+  @override
+  String get localOnlyNote =>
+      'Neue Listen werden bis zum Umzug nach Firestore nur auf diesem Gerät gespeichert.';
+
+  @override
+  String get typeText => 'Text';
+
+  @override
+  String get typeLongText => 'Langer Text';
+
+  @override
+  String get typeCheckbox => 'Kontrollkästchen';
+
+  @override
+  String get typeToggle => 'Schalter';
+
+  @override
+  String get typeNumber => 'Zahl';
+
+  @override
+  String get typeCounter => 'Zähler';
+
+  @override
+  String get typeRating => 'Bewertung';
+
+  @override
+  String get typeDateTime => 'Datum und Uhrzeit';
+
+  @override
+  String get typeChoice => 'Auswahl';
+
+  @override
+  String get typeTags => 'Schlagwörter';
+
+  @override
+  String get typeUrl => 'Link';
+
+  @override
+  String get typeChecklist => 'Unterpunkte';
+
+  @override
+  String get viewChecklist => 'Checkliste';
+
+  @override
+  String get viewSectioned => 'Abschnitte';
+
+  @override
+  String get viewTimeline => 'Zeitleiste';
+
+  @override
+  String get viewGrouped => 'Gruppen';
+
+  @override
+  String get viewTable => 'Tabelle';
+
+  @override
+  String get viewCards => 'Karten';
+
+  @override
+  String get launcherHub => 'Listen';
+
+  @override
+  String get previous => 'Zurück';
+
+  @override
+  String get next => 'Weiter';
+
+  @override
+  String get launcherNoteHint =>
+      'Doppeltippen zum Öffnen, lange drücken zum Bearbeiten';
+
+  @override
+  String hiddenValuesWarning(int count) {
+    return '$count Werte passen nicht zum neuen Typ und werden ausgeblendet aufbewahrt';
+  }
+
+  @override
+  String itemsCount(String name, int count) {
+    return '$name, $count Einträge';
+  }
+
+  @override
+  String get moveHub => 'Verschieben';
 }

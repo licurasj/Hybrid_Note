@@ -179,5 +179,79 @@
       }
     }
   },
-  "noWatchReadItemsYet": "No watch/read items yet."
+  "noWatchReadItemsYet": "No watch/read items yet.",
+  "editList": "Edit list",
+  "newList": "New list",
+  "untitledList": "Untitled list",
+  "listName": "List name",
+  "listIcon": "Icon",
+  "listColor": "Color",
+  "fields": "Fields",
+  "addField": "Add field",
+  "fieldName": "Field name",
+  "fieldType": "Field type",
+  "required": "Required",
+  "options": "Options",
+  "addOption": "Add option",
+  "layout": "Layout",
+  "groupBy": "Group by",
+  "sectionBy": "Sections by",
+  "dateField": "Date field",
+  "splitByDate": "Today / Tomorrow / Later by",
+  "filterBy": "Filter chips by",
+  "none": "None",
+  "dateCreated": "Date created",
+  "rules": "Rules",
+  "ruleClearCompleted": "Clear completed items",
+  "ruleRecurOnClear": "Repeat when cleared",
+  "ruleCopyOnClear": "Copy when cleared",
+  "ruleMoveAll": "Move all button",
+  "allowAi": "AI may read this list",
+  "deleteList": "Delete list",
+  "listDeleted": "List deleted",
+  "undo": "Undo",
+  "builtinListNote": "Built-in lists keep their fields until sync moves to Firestore. You can change the name, icon and color.",
+  "localOnlyNote": "New lists are saved on this device only until sync moves to Firestore.",
+  "typeText": "Text",
+  "typeLongText": "Long text",
+  "typeCheckbox": "Checkbox",
+  "typeToggle": "Switch",
+  "typeNumber": "Number",
+  "typeCounter": "Counter",
+  "typeRating": "Rating",
+  "typeDateTime": "Date and time",
+  "typeChoice": "Choice",
+  "typeTags": "Tags",
+  "typeUrl": "Link",
+  "typeChecklist": "Sub-items",
+  "viewChecklist": "Checklist",
+  "viewSectioned": "Sections",
+  "viewTimeline": "Timeline",
+  "viewGrouped": "Groups",
+  "viewTable": "Table",
+  "viewCards": "Cards",
+  "launcherHub": "Lists",
+  "previous": "Previous",
+  "next": "Next",
+  "launcherNoteHint": "Double-tap to open, long-press to edit",
+  "hiddenValuesWarning": "{count} values do not fit the new type and will be kept hidden",
+  "@hiddenValuesWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "itemsCount": "{name}, {count} items",
+  "@itemsCount": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "moveHub": "Move"
 }

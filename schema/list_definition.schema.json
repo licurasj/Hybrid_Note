@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/licurasj/hybrid-note/schema/list_definition.schema.json",
+  "title": "Hybrid Note list definition",
+  "description": "Format version 1. The vocabulary a list definition may use. Structural rules only: cross-references (keys named by view and behaviors, roles, options of enum fields) are checked by ListDefinition.validate() in lib/lists/list_definition.dart. Enum values here must match lib/lists/list_vocabulary.dart; test/lists/list_schema_test.dart checks this.",
+  "type": "object",
+  "required": ["formatVersion", "id", "icon", "color", "fields", "view", "updatedAt"],
+  "additionalProperties": false,
+  "properties": {
+    "formatVersion": { "type": "integer", "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "nameKey": { "type": "string" },
+    "icon": { "type": "string", "description": "Material icon name, e.g. shopping_cart." },
+    "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "templateId": { "type": ["string", "null"] },
+    "schemaRevision": { "type": "integer", "minimum": 1 },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/field" }
+    },
+    "view": { "$ref": "#/$defs/view" },
+    "behaviors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/behavior" }
+    },
+    "aiAllowed": { "type": "boolean" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "fieldType": {
+      "enum": [
+        "text", "longText", "checkbox", "toggle", "number", "counter", "rating",
+        "date", "dateTime", "enum", "category", "tags", "url", "checklist", "recurrence"
+      ]
+    },
+    "fieldRole": {
+      "enum": ["completion", "reminder", "status", "section", "category"]
+    },
+    "viewKind": {
+      "enum": ["checklist", "sectioned", "timeline", "grouped", "table", "cards"]
+    },
+    "timelineGrouping": {
+      "enum": ["year", "month"]
+    },
+    "behaviorKind": {
+      "enum": ["recurOnClear", "copyOnClear", "moveAll", "clearCompleted"]
+    },
+    "recurrenceFrequency": {
+      "enum": ["none", "daily", "weekly", "monthly", "yearly", "custom"]
+    },
+    "fieldKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+    },
+    "option": {
+      "type": "object",
+      "required": ["value"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "labelKey": { "type": "string" }
+      }
+    },
+    "field": {
+      "type": "object",
+      "required": ["key", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "$ref": "#/$defs/fieldKey" },
+        "type": { "$ref": "#/$defs/fieldType" },
+        "label": { "type": "string" },
+        "labelKey": { "type": "string" },
+        "required": { "type": "boolean" },
+        "primary": { "type": "boolean" },
+        "role": { "$ref": "#/$defs/fieldRole" },
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/option" }
+        },
+        "default": {},
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "visibleWhen": {
+          "type": "object",
+          "required": ["field", "in"],
+          "additionalProperties": false,
+          "properties": {
+            "field": { "$ref": "#/$defs/fieldKey" },
+            "in": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "view": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "$ref": "#/$defs/viewKind" },
+        "sectionBy": { "$ref": "#/$defs/fieldKey" },
+        "groupBy": { "$ref": "#/$defs/fieldKey" },
+        "dateField": { "type": "string" },
+        "timelineGrouping": { "$ref": "#/$defs/timelineGrouping" },
+        "filterChipsBy": { "$ref": "#/$defs/fieldKey" },
+        "bucketBy": { "$ref": "#/$defs/fieldKey" }
+      }
+    },
+    "behavior": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "$ref": "#/$defs/behaviorKind" },
+        "dateField": { "$ref": "#/$defs/fieldKey" },
+        "recurrenceField": { "$ref": "#/$defs/fieldKey" },
+        "when": { "$ref": "#/$defs/fieldKey" },
+        "where": { "type": "object" },
+        "setField": { "type": "object" },
+        "dedupeBy": { "$ref": "#/$defs/fieldKey" },
+        "field": { "$ref": "#/$defs/fieldKey" },
+        "from": { "type": "string" },
+        "to": { "type": "string" }
+      }
+    }
+  }
+}

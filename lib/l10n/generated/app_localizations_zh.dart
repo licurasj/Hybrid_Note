@@ -368,4 +368,179 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get noWatchReadItemsYet => '还没有观看/阅读项目。';
+
+  @override
+  String get editList => '编辑列表';
+
+  @override
+  String get newList => '新建列表';
+
+  @override
+  String get untitledList => '未命名列表';
+
+  @override
+  String get listName => '列表名称';
+
+  @override
+  String get listIcon => '图标';
+
+  @override
+  String get listColor => '颜色';
+
+  @override
+  String get fields => '字段';
+
+  @override
+  String get addField => '添加字段';
+
+  @override
+  String get fieldName => '字段名称';
+
+  @override
+  String get fieldType => '字段类型';
+
+  @override
+  String get required => '必填';
+
+  @override
+  String get options => '选项';
+
+  @override
+  String get addOption => '添加选项';
+
+  @override
+  String get layout => '布局';
+
+  @override
+  String get groupBy => '分组依据';
+
+  @override
+  String get sectionBy => '分区依据';
+
+  @override
+  String get dateField => '日期字段';
+
+  @override
+  String get splitByDate => '按今天 / 明天 / 以后划分';
+
+  @override
+  String get filterBy => '筛选依据';
+
+  @override
+  String get none => '无';
+
+  @override
+  String get dateCreated => '创建日期';
+
+  @override
+  String get rules => '规则';
+
+  @override
+  String get ruleClearCompleted => '清除已完成项';
+
+  @override
+  String get ruleRecurOnClear => '清除时重复';
+
+  @override
+  String get ruleCopyOnClear => '清除时复制';
+
+  @override
+  String get ruleMoveAll => '全部移动按钮';
+
+  @override
+  String get allowAi => '允许 AI 读取此列表';
+
+  @override
+  String get deleteList => '删除列表';
+
+  @override
+  String get listDeleted => '列表已删除';
+
+  @override
+  String get undo => '撤销';
+
+  @override
+  String get builtinListNote => '在迁移到 Firestore 之前，内置列表的字段保持不变。可以修改名称、图标和颜色。';
+
+  @override
+  String get localOnlyNote => '在迁移到 Firestore 之前，新列表只保存在此设备上。';
+
+  @override
+  String get typeText => '文本';
+
+  @override
+  String get typeLongText => '长文本';
+
+  @override
+  String get typeCheckbox => '复选框';
+
+  @override
+  String get typeToggle => '开关';
+
+  @override
+  String get typeNumber => '数字';
+
+  @override
+  String get typeCounter => '计数器';
+
+  @override
+  String get typeRating => '评分';
+
+  @override
+  String get typeDateTime => '日期和时间';
+
+  @override
+  String get typeChoice => '选择';
+
+  @override
+  String get typeTags => '标签';
+
+  @override
+  String get typeUrl => '链接';
+
+  @override
+  String get typeChecklist => '子项';
+
+  @override
+  String get viewChecklist => '清单';
+
+  @override
+  String get viewSectioned => '分区';
+
+  @override
+  String get viewTimeline => '时间线';
+
+  @override
+  String get viewGrouped => '分组';
+
+  @override
+  String get viewTable => '表格';
+
+  @override
+  String get viewCards => '卡片';
+
+  @override
+  String get launcherHub => '列表';
+
+  @override
+  String get previous => '上一页';
+
+  @override
+  String get next => '下一页';
+
+  @override
+  String get launcherNoteHint => '双击打开，长按编辑';
+
+  @override
+  String hiddenValuesWarning(int count) {
+    return '$count 个值与新类型不符，将被隐藏保留';
+  }
+
+  @override
+  String itemsCount(String name, int count) {
+    return '$name，$count 项';
+  }
+
+  @override
+  String get moveHub => '移动';
 }
