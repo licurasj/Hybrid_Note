@@ -537,7 +537,14 @@ void main() {
     test('more than 500 writes: chunked batches and a large patch', () async {
       final (String uid, _) = await _newUser();
       await _seed(uid);
-      final FirestoreListStore store = await _loaded(_db, uid);
+      // The 600-item transaction takes close to the app's 10 s on the
+      // emulator; a longer timeout keeps this test on the transaction path
+      // instead of falling back by chance (T-17 unit 5b).
+      final FirestoreListStore store = await _loaded(
+        _db,
+        uid,
+        transactionTimeout: const Duration(seconds: 60),
+      );
       const int count = 600;
       final List<ListItem> rows = [
         for (int i = 0; i < count; i++)
