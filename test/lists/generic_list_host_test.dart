@@ -30,7 +30,7 @@ Future<AppCubit> _pump(WidgetTester tester, AppData data, String listId) async {
     MultiBlocProvider(
       providers: [
         BlocProvider.value(value: cubit),
-        BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())),
+        BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())..load()),
         LocalListStore.provider(),
       ],
       child: MaterialApp(

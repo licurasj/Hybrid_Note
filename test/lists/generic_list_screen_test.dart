@@ -237,12 +237,13 @@ void main() {
       MultiBlocProvider(
         providers: [
           BlocProvider.value(value: cubit),
-          BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())),
+          BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())..load()),
           LocalListStore.provider(),
         ],
         child: _app(const GenericListHost(listId: BuiltinTemplates.watchReadId)),
       ),
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pumpAndSettle();

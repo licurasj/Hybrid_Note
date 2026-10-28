@@ -17,7 +17,7 @@ Future<CustomListsCubit> _pumpApp(WidgetTester tester) async {
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 
-  final CustomListsCubit custom = CustomListsCubit(FakeCustomListsStorage());
+  final CustomListsCubit custom = CustomListsCubit(FakeCustomListsStorage())..load();
   await tester.pumpWidget(
     MultiBlocProvider(
       providers: [

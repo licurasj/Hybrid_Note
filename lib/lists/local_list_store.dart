@@ -23,6 +23,15 @@ class LocalListStore implements ListStore {
       app.stream.listen((_) => _update()),
       custom.stream.listen((_) => _update()),
     ];
+    _customLoaded = custom.isLoaded;
+    if (_isLoaded) {
+      _ready.complete();
+    } else {
+      custom.loaded.then((_) {
+        _customLoaded = true;
+        _update();
+      });
+    }
   }
 
   final AppCubit app;
@@ -91,9 +100,24 @@ class LocalListStore implements ListStore {
     return _catalog!;
   }
 
+  // Nothing is read out until both stores have loaded (D-12): AppData and
+  // the custom-lists file.
+  bool _customLoaded = false;
+  final Completer<void> _ready = Completer<void>();
+
+  bool get _isLoaded => _customLoaded && !app.state.isLoading;
+
+  static const ListCatalog _empty = ListCatalog(definitions: [], items: []);
+
   ListCatalog? _emitted;
 
   void _update() {
+    if (!_isLoaded || _changes.isClosed) {
+      return;
+    }
+    if (!_ready.isCompleted) {
+      _ready.complete();
+    }
     final ListCatalog catalog = _current;
     // Both cubits may report one change; emit each snapshot once.
     if (!identical(catalog, _emitted)) {
@@ -109,8 +133,9 @@ class LocalListStore implements ListStore {
     await _changes.close();
   }
 
+  // Empty until the initial load is complete.
   @override
-  ListCatalog get current => _current;
+  ListCatalog get current => _isLoaded ? _current : _empty;
 
   @override
   Stream<ListCatalog> watch() {
@@ -118,7 +143,9 @@ class LocalListStore implements ListStore {
     StreamSubscription<ListCatalog>? subscription;
     controller = StreamController<ListCatalog>(
       onListen: () {
-        controller.add(_current);
+        if (_isLoaded) {
+          controller.add(_current);
+        }
         subscription = _changes.stream.listen(
           controller.add,
           onDone: controller.close,
@@ -163,6 +190,7 @@ class LocalListStore implements ListStore {
     String fieldKey,
     List<FieldOption> Function(List<FieldOption> options) change,
   ) async {
+    await _ready.future;
     final FieldDefinition? field = custom.state.definitions
         .where((definition) => definition.id == listId)
         .firstOrNull
@@ -221,12 +249,25 @@ class LocalListStore implements ListStore {
     ListDefinition definition, {
     List<ListItem> items = const [],
   }) async {
+    await _ready.future;
     if (_current.definition(definition.id) != null ||
         BuiltinTemplates.isBuiltin(definition.id)) {
       return ['list "${definition.id}" already exists'];
     }
+    // Item ids must be unique: within the new list (one document per item
+    // in Firestore) and, in this store, across every list, since item writes
+    // are routed by id.
+    final Set<String> usedIds = {
+      for (final ListItem item in _current.items) item.id,
+    };
+    final Set<String> newIds = {};
     final List<String> errors = [
       ...definition.validate(),
+      for (final ListItem item in items)
+        if (!newIds.add(item.id))
+          'item "${item.id}": duplicate id'
+        else if (usedIds.contains(item.id))
+          'item "${item.id}": id already used by another list',
       for (final ListItem item in items)
         if (item.listId != definition.id)
           'item "${item.id}": belongs to list "${item.listId}"'
@@ -245,6 +286,7 @@ class LocalListStore implements ListStore {
     String listId,
     List<ListPatchOp> ops,
   ) async {
+    await _ready.future;
     final ListDefinition? definition = _current.definition(listId);
     if (definition == null) {
       return null;
@@ -284,13 +326,15 @@ class LocalListStore implements ListStore {
   }
 
   @override
-  Future<DeletedList?> deleteList(String listId) {
+  Future<DeletedList?> deleteList(String listId) async {
+    await _ready.future;
     // The built-ins cannot be deleted.
     return custom.deleteList(listId);
   }
 
   @override
-  Future<void> restoreList(DeletedList deleted) {
-    return custom.restoreList(deleted);
+  Future<void> restoreList(DeletedList deleted) async {
+    await _ready.future;
+    await custom.restoreList(deleted);
   }
 }

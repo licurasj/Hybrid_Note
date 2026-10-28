@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -130,8 +131,21 @@ class CustomListsCubit extends Cubit<CustomListsData> {
 
   final CustomListsStorage storage;
 
+  final Completer<void> _loaded = Completer<void>();
+
+  // Completes once load() has finished, even when the file was empty or
+  // missing (which emits nothing new).
+  Future<void> get loaded => _loaded.future;
+  bool get isLoaded => _loaded.isCompleted;
+
   Future<void> load() async {
-    emit(await storage.load());
+    try {
+      emit(await storage.load());
+    } finally {
+      if (!_loaded.isCompleted) {
+        _loaded.complete();
+      }
+    }
   }
 
   Future<void> _save(CustomListsData data) async {
