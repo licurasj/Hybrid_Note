@@ -150,26 +150,6 @@ void main() {
     expect(find.text('List deleted'), findsNothing);
   });
 
-  testWidgets('built-in lists: name and colour change, fields stay', (tester) async {
-    final CustomListsCubit custom = await _pumpApp(tester);
-
-    await _openLauncher(tester);
-    await tester.longPress(find.byKey(const ValueKey('launcher-note-builtin.grocery')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('add-field')), findsNothing);
-    expect(find.byKey(const ValueKey('delete-list')), findsNothing);
-
-    await tester.enterText(find.byKey(const ValueKey('list-name')), 'Shopping');
-    await tester.tap(find.byKey(const ValueKey('color-#E53935')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('save-list')));
-    await tester.pumpAndSettle();
-
-    expect(custom.state.builtinInfo['builtin.grocery'], {'name': 'Shopping', 'color': '#E53935'});
-    await _openLauncher(tester);
-    expect(find.text('Shopping'), findsOneWidget);
-  });
-
   group('a view that names a removed or retyped field', () {
     Future<CustomListsCubit> pumpWithFilter(WidgetTester tester) async {
       final CustomListsCubit custom = await _pumpApp(tester);

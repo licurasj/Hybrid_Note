@@ -307,8 +307,8 @@ class LocalListStore implements ListStore {
         for (final ListPatchOp op in ops)
           if (op.kind != PatchOpKind.setListInfo)
             ListError(
-              ListErrorCode.builtinOnlyInfo,
-              {'list': listId, 'op': op.kind.wire},
+              ListErrorCode.badOp,
+              {'op': op.kind.wire, 'detail': 'built-in list "$listId" takes only setListInfo'},
             ),
       ];
       if (refused.isNotEmpty) {
