@@ -319,17 +319,39 @@ void main() {
       expect(catalog.definitions.last.id, 'list-0');
     });
 
+    test('lists created at the same time are ordered by id', () async {
+      final FakeFirebaseFirestore firestore = FakeFirebaseFirestore();
+      for (final String id in ['list-b', 'list-c', 'list-a']) {
+        await firestore.doc('users/$_uid/lists/$id').set({
+          ..._simple(id).toJson(),
+          '_createdAt': '2026-03-01T00:00:00.001Z',
+        });
+      }
+      final FirestoreListStore store = await _loaded(firestore);
+
+      expect(store.current.definitions.map((d) => d.id), [
+        'list-a',
+        'list-b',
+        'list-c',
+      ]);
+    });
+
     test('a patch and an undone delete keep the list in its place', () async {
       final FakeFirebaseFirestore firestore = FakeFirebaseFirestore();
+      // Explicit, distinct creation times: list-b first, although its id
+      // sorts after list-a's (two DateTime.now calls can be equal, T-17 R4).
+      const String createdAt = '2026-03-01T00:00:00.001Z';
+      for (final (String id, String time) in [
+        ('list-b', createdAt),
+        ('list-a', '2026-03-01T00:00:00.002Z'),
+      ]) {
+        await firestore.doc('users/$_uid/lists/$id').set({
+          ..._simple(id).toJson(),
+          '_createdAt': time,
+        });
+      }
       final FirestoreListStore store = await _loaded(firestore);
-      expect(await store.createList(_simple('list-b')), isEmpty);
-      expect(await store.createList(_simple('list-a')), isEmpty);
-      await _until(store, (c) => c.definitions.length == 2);
-      final Object? createdAt = (await firestore
-              .doc('users/$_uid/lists/list-b')
-              .get())
-          .data()!['_createdAt'];
-      expect(createdAt, isA<String>());
+      expect(store.current.definitions.map((d) => d.id), ['list-b', 'list-a']);
 
       final ListPatchResult? result = await store.patchList('list-b', const [
         ListPatchOp(PatchOpKind.setListInfo, {'name': 'Renamed'}),
