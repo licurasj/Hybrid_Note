@@ -309,6 +309,26 @@ void main() {
       expect(log.events, ['open n2']);
     });
 
+    testWidgets('with Edit shown, release on the hub or off the fan cancels', (tester) async {
+      final _Log log = await _pump(tester);
+      final LauncherGeometry geometry = _geometry(4);
+      final Offset tab = _tab(geometry, 2);
+
+      for (final Offset away in [geometry.hubCenter, const Offset(20, 20)]) {
+        final TestGesture gesture = await tester.startGesture(geometry.hubCenter);
+        await tester.pump(const Duration(milliseconds: 50));
+        await gesture.moveTo(tab);
+        await rest(tester);
+        expect(find.byKey(const ValueKey('launcher-edit-prompt')), findsOneWidget);
+        await moveInSteps(gesture, tester, tab, away);
+        await gesture.up();
+        await tester.pump();
+      }
+
+      expect(log.events, isEmpty);
+      expect(find.text('Note 2'), findsNothing);
+    });
+
     testWidgets('moving to another tab lets the prompt go', (tester) async {
       final _Log log = await _pump(tester);
       final LauncherGeometry geometry = _geometry(4);

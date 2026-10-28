@@ -414,9 +414,19 @@ class RadialLauncherState extends State<RadialLauncher>
     if (prompt != null && prompt.kind == _PromptKind.edit) {
       final LauncherNote note = widget.notes[prompt.noteIndex!];
       final bool edit = prompt.selected;
+      // Not on the prompt: act on what is under the finger, as if the prompt
+      // had never appeared. Back on the tab opens it; on the hub, off the fan
+      // or short of the prompt nothing happens.
+      final LauncherGeometry? geometry = _geometry;
+      final bool onTab = geometry != null &&
+          geometry.hitTest(event.position, _scrollOffset) ==
+              LauncherTarget(LauncherTargetKind.note, prompt.noteIndex);
       _close();
-      // Not on the prompt: a plain select, as if it had never appeared.
-      edit ? widget.onEdit(note) : widget.onOpen(note);
+      if (edit) {
+        widget.onEdit(note);
+      } else if (onTab) {
+        widget.onOpen(note);
+      }
       return;
     }
 
