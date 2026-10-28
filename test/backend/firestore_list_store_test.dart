@@ -667,6 +667,52 @@ void main() {
       expect(stored.schemaRevision, other.schemaRevision + 1);
     });
 
+    test('an option added on another device meanwhile is kept', () async {
+      final _ScriptedFirestore firestore = await _seeded(_ScriptedFirestore());
+      final FirestoreListStore a = await _loaded(firestore);
+      final ListDefinition list = ListDefinition.fromJson({
+        ..._simple('list-a').toJson(),
+        'fields': [
+          ..._simple('list-a').toJson()['fields'] as List,
+          {
+            'key': 'room',
+            'type': 'category',
+            'label': 'Room',
+            'options': [
+              {'value': 'hall'},
+            ],
+          },
+        ],
+      });
+      expect(await a.createList(list), isEmpty);
+      await _until(a, (c) => c.definition('list-a') != null);
+
+      // Another device adds "attic" just before A's transaction reads; A's
+      // cache still has only "hall".
+      final ListDefinition other = ListPatch.apply(list, const [], const [
+        ListPatchOp(PatchOpKind.setOptions, {
+          'key': 'room',
+          'options': [
+            {'value': 'hall'},
+            {'value': 'attic'},
+          ],
+        }),
+      ], _t0).definition;
+      firestore.beforeTransaction = () async {
+        firestore.beforeTransaction = null;
+        await firestore.doc('users/$_uid/lists/list-a').set(other.toJson());
+      };
+      await a.addOption('list-a', 'room', 'cellar');
+      final ListDefinition stored = ListDefinition.fromJson(
+        await _doc(firestore, 'list-a'),
+      );
+      expect(stored.field('room')!.options.map((o) => o.value), [
+        'hall',
+        'attic',
+        'cellar',
+      ]);
+    });
+
     test('a patch refused in the transaction writes nothing', () async {
       final _ScriptedFirestore firestore = await _seeded(_ScriptedFirestore());
       final FirestoreListStore store = await _loaded(firestore);

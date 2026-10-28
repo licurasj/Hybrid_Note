@@ -417,18 +417,23 @@ class FirestoreListStore implements ListStore {
     List<FieldOption> Function(List<FieldOption> options) change,
   ) async {
     await _ready.future;
-    final FieldDefinition? field = _definitions[listId]?.field(fieldKey);
-    if (field == null) {
+    if (_definitions[listId]?.field(fieldKey) == null) {
       return;
     }
-    await patchList(listId, [
-      ListPatchOp(PatchOpKind.setOptions, {
-        'key': fieldKey,
-        'options': change(
-          field.options,
-        ).map((option) => option.toJson()).toList(),
-      }),
-    ]);
+    // The options are worked out from the definition the patch is applied
+    // to, so a transaction retried after another device's option change
+    // keeps that change.
+    await _patch(
+      listId,
+      (definition) => [
+        ListPatchOp(PatchOpKind.setOptions, {
+          'key': fieldKey,
+          'options': change(
+            definition.field(fieldKey)?.options ?? const [],
+          ).map((option) => option.toJson()).toList(),
+        }),
+      ],
+    );
   }
 
   @override
@@ -495,23 +500,32 @@ class FirestoreListStore implements ListStore {
   // server cannot be reached. Items the transaction could not see are left
   // to the repair step.
   @override
-  Future<ListPatchResult?> patchList(
+  Future<ListPatchResult?> patchList(String listId, List<ListPatchOp> ops) {
+    return _patch(listId, (_) => ops);
+  }
+
+  // [opsFor] gives the ops for the definition they are applied to: the
+  // stored one in the transaction, the cached one in the fallback.
+  Future<ListPatchResult?> _patch(
     String listId,
-    List<ListPatchOp> ops,
+    List<ListPatchOp> Function(ListDefinition definition) opsFor,
   ) async {
     await _ready.future;
     if (!_definitions.containsKey(listId)) {
       return null;
     }
     try {
-      return await _patchInTransaction(listId, ops).timeout(transactionTimeout);
+      return await _patchInTransaction(
+        listId,
+        opsFor,
+      ).timeout(transactionTimeout);
     } on TimeoutException {
-      return _patchCached(listId, ops);
+      return _patchCached(listId, opsFor);
     } on FirebaseException catch (error) {
       if (!_offlineCodes.contains(error.code)) {
         rethrow;
       }
-      return _patchCached(listId, ops);
+      return _patchCached(listId, opsFor);
     }
   }
 
@@ -521,7 +535,7 @@ class FirestoreListStore implements ListStore {
   // items in batches after it; the repair step covers an interruption.
   Future<ListPatchResult?> _patchInTransaction(
     String listId,
-    List<ListPatchOp> ops,
+    List<ListPatchOp> Function(ListDefinition definition) opsFor,
   ) async {
     final List<String> itemIds = _items[listId]?.keys.toList() ?? const [];
     List<ListItem> later = const [];
@@ -553,7 +567,7 @@ class FirestoreListStore implements ListStore {
       final ListPatchResult result = ListPatch.apply(
         definition,
         items,
-        ops,
+        opsFor(definition),
         DateTime.now().toUtc(),
       );
       if (!result.isValid) {
@@ -594,7 +608,7 @@ class FirestoreListStore implements ListStore {
   // changed the definition meanwhile, the later write wins.
   Future<ListPatchResult?> _patchCached(
     String listId,
-    List<ListPatchOp> ops,
+    List<ListPatchOp> Function(ListDefinition definition) opsFor,
   ) async {
     final ListDefinition? definition = _definitions[listId];
     if (definition == null) {
@@ -603,7 +617,7 @@ class FirestoreListStore implements ListStore {
     final ListPatchResult result = ListPatch.apply(
       definition,
       _items[listId]?.values.toList() ?? const [],
-      ops,
+      opsFor(definition),
       DateTime.now().toUtc(),
     );
     if (result.isValid) {
