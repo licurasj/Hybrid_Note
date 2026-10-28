@@ -1,13 +1,13 @@
 rules_version = '2';
 
 // Q-8 B: each signed-in user reads and writes only their own users/{uid}
-// tree, with light shape and size checks. Reading in the app stays tolerant
-// (a malformed document is skipped), so these checks guard against writes
-// that are clearly wrong, not against every invalid list.
+// tree, with light shape checks. Reading in the app stays tolerant (a
+// malformed document is skipped), so these checks guard against writes that
+// are clearly wrong, not against every invalid list.
 //
-// Rules cannot measure a document's bytes, so the size limit is a cap on
-// key and entry counts and on id length; Firestore's own 1 MiB per document
-// stays the hard limit.
+// There are no caps on key or entry counts (T-14 R4): the app accepts any
+// number of fields and keeps hidden values, so a cap would make valid lists
+// unwritable. Firestore's 1 MiB per document is the only size limit.
 //
 // Item documents carry the store's `_rev` (an int) next to the item's JSON.
 // Arrays inside arrays are stored as {"__array": [...]} maps; the rules do
@@ -27,12 +27,11 @@ service cloud.firestore {
     function isList(listId) {
       let data = request.resource.data;
       return data.keys().hasAll(['id', 'icon', 'color', 'fields', 'view', 'updatedAt'])
-        && data.size() <= 40
         && isId(data.id) && data.id == listId
         && data.icon is string && data.color is string
-        && data.fields is list && data.fields.size() <= 100
+        && data.fields is list
         && data.view is map
-        && (!('behaviors' in data) || (data.behaviors is list && data.behaviors.size() <= 50))
+        && (!('behaviors' in data) || data.behaviors is list)
         && (!('schemaRevision' in data) || data.schemaRevision is int)
         && data.updatedAt is string;
     }
@@ -41,10 +40,9 @@ service cloud.firestore {
     function isItem(listId, itemId) {
       let data = request.resource.data;
       return data.keys().hasAll(['id', 'listId', 'values', 'createdAt', 'updatedAt'])
-        && data.size() <= 12
         && isId(data.id) && data.id == itemId
         && data.listId == listId
-        && data.values is map && data.values.size() <= 200
+        && data.values is map
         && data.createdAt is string && data.updatedAt is string
         && (!('_rev' in data) || data._rev is int);
     }

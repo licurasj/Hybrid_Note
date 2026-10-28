@@ -220,18 +220,22 @@ describe('list shape', () => {
     await assertFails(setDoc(ref(), list('books', { updatedAt: new Date() })));
   });
 
-  test('size limits: ids, keys, fields and behaviors', async () => {
+  test('ids longer than 128 characters are refused', async () => {
     const longId = 'x'.repeat(129);
     await assertFails(
       setDoc(doc(owner(), `users/${OWNER}/lists/${longId}`), list(longId)),
     );
-    const extra = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`k${i}`, i]));
-    await assertFails(setDoc(ref(), list('books', extra)));
-    const fields = Array.from({ length: 101 }, (_, i) => ({ key: `f${i}`, type: 'text' }));
-    await assertFails(setDoc(ref(), list('books', { fields })));
-    await assertSucceeds(setDoc(ref(), list('books', { fields: fields.slice(0, 100) })));
-    const behaviors = Array.from({ length: 51 }, () => ({ kind: 'clearCompleted' }));
-    await assertFails(setDoc(ref(), list('books', { behaviors })));
+  });
+
+  // T-14 R4: no count caps; the app accepts any number of fields and keeps
+  // unknown keys, so the rules must too.
+  test('no count limits on keys, fields or behaviors', async () => {
+    const extra = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`k${i}`, i]));
+    await assertSucceeds(setDoc(ref(), list('books', extra)));
+    const fields = Array.from({ length: 150 }, (_, i) => ({ key: `f${i}`, type: 'text' }));
+    await assertSucceeds(setDoc(ref(), list('books', { fields })));
+    const behaviors = Array.from({ length: 60 }, () => ({ kind: 'clearCompleted' }));
+    await assertSucceeds(setDoc(ref(), list('books', { behaviors })));
   });
 
   test('an update is checked like a create', async () => {
@@ -264,12 +268,22 @@ describe('item shape', () => {
     await assertFails(setDoc(ref(), item('ivy', 'plants', { _rev: '2' })));
   });
 
-  test('size limits: keys and values', async () => {
-    const extra = Object.fromEntries(Array.from({ length: 7 }, (_, i) => [`k${i}`, i]));
-    await assertFails(setDoc(ref(), item('ivy', 'plants', extra)));
-    const values = Object.fromEntries(Array.from({ length: 201 }, (_, i) => [`v${i}`, i]));
-    await assertFails(setDoc(ref(), item('ivy', 'plants', { values })));
-    delete values.v200;
+  // T-14 R4: an item keeps hidden values when its list loses fields, so it
+  // can carry many more value keys than the list has fields.
+  test('no count limits on keys or values', async () => {
+    const extra = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`k${i}`, i]));
+    await assertSucceeds(setDoc(ref(), item('ivy', 'plants', extra)));
+  });
+
+  test('an app-produced item with many hidden values is allowed', async () => {
+    // As the store writes it after a list dropped 250 fields and changed the
+    // type of 50 more: the dropped values stay as hidden keys, the changed
+    // ones are archived in `_legacy` with the nested-array encoding.
+    const values = { name: 'ivy' };
+    for (let i = 0; i < 250; i++) values[`old${i}`] = `value ${i}`;
+    const legacy = {};
+    for (let i = 0; i < 50; i++) legacy[`tags${i}`] = [{ __array: ['a', 'b'] }];
+    values._legacy = legacy;
     await assertSucceeds(setDoc(ref(), item('ivy', 'plants', { values })));
   });
 });
