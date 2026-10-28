@@ -7,10 +7,18 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 
 import 'app_data.dart';
+import 'backend/firebase_auth_bridge.dart';
 import 'sync_result.dart';
 
 class DriveSyncService {
+  DriveSyncService({FirebaseAuthBridge? firebaseAuth})
+      : _firebaseAuth = firebaseAuth ?? FirebaseAuthBridge();
+
   static const String _fileName = 'hybrid_note_app_data.json';
+  static const String _webSyncUnavailable =
+      'Google Drive sync is not available on web.';
+
+  final FirebaseAuthBridge _firebaseAuth;
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: [
@@ -20,28 +28,58 @@ class DriveSyncService {
 
   http.Client? _authClient;
 
+  // Web signs in to Firebase only (Q-7 A); Drive sync is Android-only.
   bool get isSignedIn {
+    if (kIsWeb) {
+      return _firebaseAuth.isSignedIn;
+    }
     return _googleSignIn.currentUser != null;
   }
 
   String? get signedInEmail {
+    if (kIsWeb) {
+      return _firebaseAuth.signedInEmail;
+    }
     return _googleSignIn.currentUser?.email;
   }
 
   Future<bool> signIn() async {
+    if (kIsWeb) {
+      return _firebaseAuth.signInWithPopup();
+    }
+
     final drive.DriveApi? api = await _getDriveApi();
+    final GoogleSignInAccount? account = _googleSignIn.currentUser;
+
+    if (api != null && account != null) {
+      await _firebaseAuth.signInWithGoogleAccount(account);
+    }
     return api != null;
   }
 
   Future<void> signOut() async {
+    await _firebaseAuth.signOut();
+
+    if (kIsWeb) {
+      return;
+    }
+
     await _googleSignIn.signOut();
     _authClient?.close();
     _authClient = null;
   }
 
   Future<bool> tryRestorePreviousSignIn() async {
+    if (kIsWeb) {
+      return _firebaseAuth.restore();
+    }
+
     try {
       final GoogleSignInAccount? account = await _googleSignIn.signInSilently();
+
+      if (account != null) {
+        await _firebaseAuth.signInWithGoogleAccount(account);
+      }
       return account != null;
     } catch (_) {
       return false;
@@ -51,6 +89,10 @@ class DriveSyncService {
   Future<SyncResult> sync({
     required AppData localData,
   }) async {
+    if (kIsWeb) {
+      return SyncResult.failed(_webSyncUnavailable);
+    }
+
     try {
       final drive.DriveApi? driveApi = await _getDriveApi();
 
@@ -74,6 +116,10 @@ class DriveSyncService {
   Future<SyncResult> autoSyncIfSignedIn({
     required AppData localData,
   }) async {
+    if (kIsWeb) {
+      return SyncResult.failed(_webSyncUnavailable);
+    }
+
     try {
       if (_googleSignIn.currentUser == null) {
         await tryRestorePreviousSignIn();
@@ -110,6 +156,10 @@ class DriveSyncService {
   Future<SyncResult> pushLocalToDrive({
     required AppData localData,
   }) async {
+    if (kIsWeb) {
+      return SyncResult.failed(_webSyncUnavailable);
+    }
+
     try {
       if (_googleSignIn.currentUser == null) {
         return SyncResult.failed(
