@@ -423,7 +423,16 @@ class FirestoreListStore implements ListStore {
     );
   }
 
+  // Only the first call closes; a later one (also while the first is still
+  // running) returns at once. The app closes a store when its user changes,
+  // and tests close it again at tear-down.
+  bool _closed = false;
+
   Future<void> close() async {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
     await _listsSubscription.cancel();
     for (final StreamSubscription<Object?> subscription
         in _itemSubscriptions.values) {
