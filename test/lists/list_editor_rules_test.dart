@@ -226,9 +226,9 @@ void main() {
     final save = await _openEditor(tester, both);
     expect(find.byKey(const ValueKey('add-rule')), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('remove-rule-moveAll')));
+    await tester.tap(find.byKey(const ValueKey('remove-rule-moveAll-0')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('rule-moveAll')), findsNothing);
+    expect(find.byKey(const ValueKey('rule-moveAll-0')), findsNothing);
     expect(find.byKey(const ValueKey('add-rule')), findsOneWidget);
 
     final ListEditorOutcome? outcome = await save();
@@ -236,6 +236,42 @@ void main() {
       {'op': 'removeBehavior', 'kind': 'moveAll'},
     ]);
     expect(outcome.result!.definition.behaviors.map((behavior) => behavior.kind.wire), ['recurOnClear']);
+  });
+
+  testWidgets('a stored list with two rules of one kind opens and lists both', (tester) async {
+    // The schema allows repeated kinds, for example from a template or the AI.
+    final ListDefinition twice = _list([
+      _done,
+      {
+        'key': 'run',
+        'type': 'enum',
+        'label': 'Run',
+        'options': [
+          {'value': 'now', 'label': 'This run'},
+          {'value': 'later', 'label': 'Next run'},
+          {'value': 'someday', 'label': 'Someday'},
+        ],
+      },
+    ], behaviors: [
+      {'kind': 'moveAll', 'field': 'run', 'from': 'later', 'to': 'now'},
+      {'kind': 'moveAll', 'field': 'run', 'from': 'someday', 'to': 'later'},
+    ]);
+    final save = await _openEditor(tester, twice);
+
+    expect(tester.takeException(), isNull);
+    expect(find.descendant(of: find.byKey(const ValueKey('rule-moveAll-0')), matching: find.text('Run: Next run → This run')), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const ValueKey('rule-moveAll-1')), matching: find.text('Run: Someday → Next run')), findsOneWidget);
+
+    // removeBehavior works by kind, so removing one removes both.
+    await tester.tap(find.byKey(const ValueKey('remove-rule-moveAll-1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('rule-moveAll-0')), findsNothing);
+
+    final ListEditorOutcome? outcome = await save();
+    expect(outcome!.ops.map((op) => op.toJson()), [
+      {'op': 'removeBehavior', 'kind': 'moveAll'},
+    ]);
+    expect(outcome.result!.definition.behaviors, isEmpty);
   });
 
   group('invalid choices show the translated error and cannot be added', () {

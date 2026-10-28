@@ -97,6 +97,15 @@ class ListEditorRules extends StatelessWidget {
     final List<BehaviorDefinition> others = definition.behaviors
         .where((behavior) => behavior.kind != BehaviorKind.clearCompleted)
         .toList();
+    // A stored list may hold several rules of one kind (the schema allows
+    // it), so tiles are keyed by kind and their place among that kind.
+    final Map<BehaviorKind, int> seen = {};
+    final List<String> ids = [];
+    for (final BehaviorDefinition behavior in others) {
+      final int place = seen[behavior.kind] ?? 0;
+      seen[behavior.kind] = place + 1;
+      ids.add('${behavior.kind.wire}-$place');
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -116,9 +125,9 @@ class ListEditorRules extends StatelessWidget {
                 : removeOp(BehaviorKind.clearCompleted),
           ),
         ),
-        for (final BehaviorDefinition behavior in others)
+        for (final (int index, BehaviorDefinition behavior) in others.indexed)
           ListTile(
-            key: ValueKey('rule-${behavior.kind.wire}'),
+            key: ValueKey('rule-${ids[index]}'),
             contentPadding: EdgeInsets.zero,
             title: Text(labels.behavior(behavior.kind)),
             subtitle: switch (_summary(behavior)) {
@@ -126,7 +135,7 @@ class ListEditorRules extends StatelessWidget {
               null => null,
             },
             trailing: IconButton(
-              key: ValueKey('remove-rule-${behavior.kind.wire}'),
+              key: ValueKey('remove-rule-${ids[index]}'),
               tooltip: loc.delete,
               icon: const Icon(Icons.delete_outline),
               onPressed: () => onOp(removeOp(behavior.kind)),
