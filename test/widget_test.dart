@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -355,6 +356,49 @@ void main() {
         findsOneWidget);
   });
 
+  // T-17 F1: the editor has closed when the patch fails, so the failure is
+  // reported rather than lost.
+  testWidgets('a list edit that cannot be saved shows a message', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    SharedPreferences.setMockInitialValues(const {});
+    final _RefusingTransactions firestore = _RefusingTransactions();
+    final FirestoreListStore store = await widgetTestStore(
+      tester,
+      firestore: firestore,
+    );
+    await tester.pumpWidget(
+      await testApp(
+        auth: FakeAuthService(user: testUser),
+        openStore: (_) => store,
+      ),
+    );
+    await settle(tester);
+
+    await tester.tap(_hub);
+    await tester.pump();
+    await tester.longPress(
+      find.byKey(const ValueKey('launcher-note-${BuiltinTemplates.groceryId}')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('list-name')), 'Shops');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('save-list')));
+    await settle(tester);
+
+    expect(
+      find.text('A list change could not be saved and was undone.'),
+      findsOneWidget,
+    );
+    expect(
+      store.current.definition(BuiltinTemplates.groceryId)!.name,
+      isNot('Shops'),
+    );
+  });
+
   group('starter lists could not be written (Q-27)', () {
     // An empty account whose seeding failed once; [seeds] records each
     // later attempt (empty = "Start empty").
@@ -446,4 +490,19 @@ void main() {
     final SharedPreferences preferences = await SharedPreferences.getInstance();
     expect(preferences.getDouble(AppSettingsCubit.hubXKey), isNotNull);
   });
+}
+
+// A server that refuses every transaction, as the rules would.
+class _RefusingTransactions extends FakeFirebaseFirestore {
+  @override
+  Future<T> runTransaction<T>(
+    TransactionHandler<T> transactionHandler, {
+    Duration timeout = const Duration(seconds: 30),
+    int maxAttempts = 5,
+  }) async {
+    throw FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'permission-denied',
+    );
+  }
 }

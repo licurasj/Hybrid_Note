@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -124,8 +126,16 @@ class _MainShellState extends State<MainShell> {
     }
 
     // The store re-applies the ops to its current items, in case they changed
-    // meanwhile, and saves only a valid result.
-    await store.patchList(listId, outcome.ops);
+    // meanwhile, and saves only a valid result. The editor has closed, so a
+    // failure is reported here rather than lost (T-17 F1).
+    final AppLocalizations loc = AppLocalizations.of(context);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      await store.patchList(listId, outcome.ops);
+    } on Object catch (error) {
+      developer.log('patch $listId failed: $error', name: 'MainShell');
+      messenger.showSnackBar(SnackBar(content: Text(loc.listChangeNotSaved)));
+    }
   }
 
   // Deleting is immediate, with Undo in a snackbar and no trash bin (D-5).

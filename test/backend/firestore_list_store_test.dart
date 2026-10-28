@@ -60,6 +60,7 @@ class _ScriptedFirestore extends FakeFirebaseFirestore {
   Future<void> Function()? beforeBatch;
   final List<String> deleted = [];
   Object? failWith;
+  FirebaseException? failReadOnWeb;
   bool hang = false;
   Completer<void>? hold;
   Future<Object?>? held;
@@ -78,6 +79,17 @@ class _ScriptedFirestore extends FakeFirebaseFirestore {
     final Object? failure = failWith;
     if (failure != null) {
       throw failure;
+    }
+    // Like cloud_firestore_web: the handler's read fails, and the error
+    // reaches the caller wrapped in a JavaScript error (T-17 F1).
+    final FirebaseException? readFailure = failReadOnWeb;
+    if (readFailure != null) {
+      try {
+        await transactionHandler(_FailingTransaction(readFailure));
+      } on Object catch (error) {
+        throw _JsError('Error: Dart exception: $error');
+      }
+      throw StateError('the read did not fail');
     }
     if (hang) {
       return Completer<T>().future;
@@ -101,6 +113,30 @@ class _ScriptedFirestore extends FakeFirebaseFirestore {
       maxAttempts: maxAttempts,
     );
   }
+}
+
+class _FailingTransaction extends Fake implements Transaction {
+  _FailingTransaction(this.failure);
+
+  final FirebaseException failure;
+
+  @override
+  Future<DocumentSnapshot<T>> get<T extends Object?>(
+    DocumentReference<T> documentReference,
+  ) async {
+    throw failure;
+  }
+}
+
+// What a rejected JavaScript promise becomes in Dart: not a
+// FirebaseException.
+class _JsError {
+  _JsError(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 class _ScriptedBatch implements WriteBatch {
@@ -1072,6 +1108,63 @@ void main() {
         );
         expect(result!.errors, isEmpty);
         await _until(store, (c) => c.itemsOf('list-a').single['kind'] == 1);
+      },
+    );
+
+    // T-17 F1: on web the offline read error arrives wrapped in a
+    // JavaScript error; the fallback must still apply, without waiting for
+    // the timeout.
+    test('offline on web, a patch falls back to the cache at once', () async {
+      final _ScriptedFirestore firestore = await _seeded(_ScriptedFirestore());
+      final FirestoreListStore store = await _loaded(firestore);
+      await store.createList(_simple('list-a'), items: [_kind('one', '1')]);
+      await _until(store, (c) => c.itemsOf('list-a').length == 1);
+
+      firestore.failReadOnWeb = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'unavailable',
+        message: 'Connection failed.',
+      );
+      final ListPatchResult? result = await store
+          .patchList('list-a', const [
+            ListPatchOp(PatchOpKind.setListInfo, {'name': 'Renamed offline'}),
+          ])
+          .timeout(const Duration(seconds: 2));
+      expect(result!.errors, isEmpty);
+      await _until(
+        store,
+        (c) => c.definition('list-a')!.name == 'Renamed offline',
+      );
+      expect((await _doc(firestore, 'list-a'))['name'], 'Renamed offline');
+    });
+
+    test(
+      'on web, a read refused for another reason still fails the patch',
+      () async {
+        final _ScriptedFirestore firestore = await _seeded(
+          _ScriptedFirestore(),
+        );
+        final FirestoreListStore store = await _loaded(firestore);
+        await store.createList(_simple('list-a'));
+        await _until(store, (c) => c.definition('list-a') != null);
+
+        firestore.failReadOnWeb = FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'permission-denied',
+        );
+        await expectLater(
+          store.patchList('list-a', const [
+            ListPatchOp(PatchOpKind.setListInfo, {'name': 'Not allowed'}),
+          ]),
+          throwsA(
+            isA<FirebaseException>().having(
+              (e) => e.code,
+              'code',
+              'permission-denied',
+            ),
+          ),
+        );
+        expect(store.current.definition('list-a')!.name, isNot('Not allowed'));
       },
     );
 

@@ -735,62 +735,92 @@ class FirestoreListStore implements ListStore {
     final List<String> itemIds = _items[listId]?.keys.toList() ?? const [];
     final DateTime now = DateTime.now().toUtc();
     List<String> later = const [];
-    final ListPatchResult? result = await firestore.runTransaction((
-      transaction,
+    // On web, a read that fails inside the transaction (offline) reaches
+    // the caller as a JavaScript error instead of the FirebaseException it
+    // was, so the offline fallback would not see its code (T-17 F1). The
+    // failed read of the last attempt is kept and thrown instead.
+    FirebaseException? readError;
+    Future<DocumentSnapshot<Map<String, dynamic>>> read(
+      Transaction transaction,
+      DocumentReference<Map<String, dynamic>> ref,
     ) async {
-      later = const [];
-      final DocumentSnapshot<Map<String, dynamic>> stored = await transaction
-          .get(_lists.doc(listId));
-      final Map<String, dynamic>? data = stored.data();
-      if (data == null) {
-        return null;
+      try {
+        return await transaction.get(ref);
+      } on FirebaseException catch (error) {
+        readError = error;
+        rethrow;
       }
-      final ListDefinition definition = _definitionFrom(data);
-      final List<ListItem> items = [];
-      for (final String itemId in itemIds) {
-        final Map<String, dynamic>? itemData = (await transaction.get(
-          _itemsOf(listId).doc(itemId),
-        )).data();
-        if (itemData == null) {
-          continue;
+    }
+
+    final ListPatchResult? result;
+    try {
+      result = await firestore.runTransaction((transaction) async {
+        later = const [];
+        readError = null;
+        final DocumentSnapshot<Map<String, dynamic>> stored = await read(
+          transaction,
+          _lists.doc(listId),
+        );
+        final Map<String, dynamic>? data = stored.data();
+        if (data == null) {
+          return null;
         }
-        try {
-          items.add(_itemFrom(itemData));
-        } on Object {
-          // Skipped and reported by the read side.
+        final ListDefinition definition = _definitionFrom(data);
+        final List<ListItem> items = [];
+        for (final String itemId in itemIds) {
+          final Map<String, dynamic>? itemData = (await read(
+            transaction,
+            _itemsOf(listId).doc(itemId),
+          )).data();
+          if (itemData == null) {
+            continue;
+          }
+          try {
+            items.add(_itemFrom(itemData));
+          } on Object {
+            // Skipped and reported by the read side.
+          }
         }
-      }
-      final ListPatchResult result = ListPatch.apply(
-        definition,
-        items,
-        opsFor(definition),
-        now,
-      );
-      // Checked after the last read, with no await before the writes.
-      if (!result.isValid || abandoned()) {
+        final ListPatchResult result = ListPatch.apply(
+          definition,
+          items,
+          opsFor(definition),
+          now,
+        );
+        // Checked after the last read, with no await before the writes.
+        if (!result.isValid || abandoned()) {
+          return result;
+        }
+        final int revision = result.definition.schemaRevision;
+        final List<ListItem> changed = [
+          for (final ListItem item in result.items)
+            if (result.changedItemIds.contains(item.id)) item,
+        ];
+        transaction.set(
+          _lists.doc(listId),
+          definitionData(result.definition, createdAt: _createdAtOf(data)),
+        );
+        if (changed.length < batchLimit) {
+          for (final ListItem item in changed) {
+            transaction.set(
+              _itemsOf(listId).doc(item.id),
+              itemData(item, revision),
+            );
+          }
+        } else {
+          later = [for (final ListItem item in changed) item.id];
+        }
         return result;
+      });
+    } on FirebaseException {
+      rethrow;
+    } on Object {
+      final FirebaseException? cause = readError;
+      if (cause == null) {
+        rethrow;
       }
-      final int revision = result.definition.schemaRevision;
-      final List<ListItem> changed = [
-        for (final ListItem item in result.items)
-          if (result.changedItemIds.contains(item.id)) item,
-      ];
-      transaction.set(
-        _lists.doc(listId),
-        definitionData(result.definition, createdAt: _createdAtOf(data)),
-      );
-      if (changed.length < batchLimit) {
-        for (final ListItem item in changed) {
-          transaction.set(
-            _itemsOf(listId).doc(item.id),
-            itemData(item, revision),
-          );
-        }
-      } else {
-        later = [for (final ListItem item in changed) item.id];
-      }
-      return result;
-    });
+      throw cause;
+    }
     if (result != null && later.isNotEmpty && !abandoned()) {
       await _refit(listId, later, touchedAt: now);
     }
