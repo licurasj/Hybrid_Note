@@ -1,4 +1,5 @@
 import 'list_definition.dart';
+import 'list_error.dart';
 import 'list_item.dart';
 import 'list_vocabulary.dart';
 
@@ -71,7 +72,7 @@ class ListPatchResult {
   // `_legacy` slot, so nothing is destroyed (Q-4, plan 4.4).
   final int hiddenValues;
   // Empty when the patched definition is valid.
-  final List<String> errors;
+  final List<ListError> errors;
 
   bool get isValid => errors.isEmpty;
 }
@@ -98,7 +99,7 @@ class ListPatch {
     List<ListPatchOp> ops,
     DateTime now,
   ) {
-    final List<String> errors = [];
+    final List<ListError> errors = [];
     final List<FieldDefinition> fields = [...definition.fields];
     final Map<String, dynamic> info = {};
     ViewDefinition view = definition.view;
@@ -134,7 +135,10 @@ class ListPatch {
         PatchOpKind.moveField,
       }.contains(op.kind);
       if (needsField && index < 0) {
-        errors.add('${op.kind.wire}: no field "${op.key}"');
+        errors.add(ListError(
+          ListErrorCode.opNoField,
+          {'op': op.kind.wire, 'field': op.key ?? ''},
+        ));
         continue;
       }
 
@@ -145,7 +149,7 @@ class ListPatch {
           case PatchOpKind.addField:
             final FieldDefinition field = FieldDefinition.fromJson(op.args['field']);
             if (indexOf(field.key) >= 0) {
-              errors.add('addField: "${field.key}" already exists');
+              errors.add(ListError(ListErrorCode.fieldExists, {'field': field.key}));
               continue;
             }
             final Object? at = op.args['index'];
@@ -170,7 +174,10 @@ class ListPatch {
             final FieldDefinition field = fields[index];
             final FieldType? type = enumFromWire(FieldType.values, op.args['type']);
             if (type == null) {
-              errors.add('changeFieldType: unknown type "${op.args['type']}"');
+              errors.add(ListError(
+                ListErrorCode.unknownFieldType,
+                {'type': '${op.args['type']}'},
+              ));
               continue;
             }
             List<FieldOption> options = op.args['options'] is List
@@ -226,7 +233,10 @@ class ListPatch {
             behaviors.removeWhere((behavior) => behavior.kind.wire == op.args['kind']);
         }
       } on FormatException catch (error) {
-        errors.add('${op.kind.wire}: ${error.message}');
+        errors.add(ListError(
+          ListErrorCode.badOp,
+          {'op': op.kind.wire, 'detail': error.message},
+        ));
       }
     }
 

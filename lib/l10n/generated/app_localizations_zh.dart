@@ -543,4 +543,243 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get moveHub => '移动';
+
+  @override
+  String errorFormatTooNew(String version) {
+    return '此列表来自更新版本的应用（格式 $version）。';
+  }
+
+  @override
+  String get errorEmptyId => '列表没有 ID。';
+
+  @override
+  String get errorMissingName => '列表需要名称。';
+
+  @override
+  String get errorBadColor => '颜色必须是 #RRGGBB 格式。';
+
+  @override
+  String get errorNoFields => '列表至少需要一个字段。';
+
+  @override
+  String get errorPrimaryCount => '必须恰好有一个主字段。';
+
+  @override
+  String get errorPrimaryNotText => '主字段必须是文本字段。';
+
+  @override
+  String errorDuplicateRole(String role) {
+    return '只有一个字段可以具有角色 $role。';
+  }
+
+  @override
+  String errorBadFieldKey(String field) {
+    return '字段键“$field”必须以字母开头，且只能包含字母、数字或 _。';
+  }
+
+  @override
+  String errorReservedFieldKey(String field) {
+    return '字段键“$field”是保留的。';
+  }
+
+  @override
+  String errorDuplicateFieldKey(String field) {
+    return '两个字段使用了同一个键“$field”。';
+  }
+
+  @override
+  String errorMissingFieldLabel(String field) {
+    return '字段“$field”需要名称。';
+  }
+
+  @override
+  String errorMissingOptions(String field) {
+    return '字段“$field”至少需要一个选项。';
+  }
+
+  @override
+  String errorOptionsNotAllowed(String field, String type) {
+    return '字段“$field”：$type 类型的字段不能有选项。';
+  }
+
+  @override
+  String errorDuplicateOption(String field, String option) {
+    return '字段“$field”：选项“$option”重复。';
+  }
+
+  @override
+  String errorDefaultNotOption(String field) {
+    return '字段“$field”：默认值不在选项中。';
+  }
+
+  @override
+  String errorMinAboveMax(String field) {
+    return '字段“$field”：最小值大于最大值。';
+  }
+
+  @override
+  String errorConditionNotChoice(String field) {
+    return '字段“$field”只能依赖于选择字段。';
+  }
+
+  @override
+  String errorConditionOnItself(String field) {
+    return '字段“$field”不能依赖于自身。';
+  }
+
+  @override
+  String errorConditionNotOption(String field, String value, String target) {
+    return '字段“$field”：“$value”不是“$target”的选项。';
+  }
+
+  @override
+  String errorRoleNeedsType(String field, String role, String type) {
+    return '字段“$field”：角色 $role 需要 $type 类型。';
+  }
+
+  @override
+  String errorViewNeedsParam(String view, String param) {
+    return '布局“$view”需要为“$param”指定字段。';
+  }
+
+  @override
+  String errorViewParamNotField(String param, String field) {
+    return '“$param”：“$field”不是此列表的字段。';
+  }
+
+  @override
+  String errorViewParamWrongType(String param, String field, String types) {
+    return '“$param”：“$field”必须是 $types 类型。';
+  }
+
+  @override
+  String get errorChecklistNeedsCompletion => '清单布局需要一个用于标记完成的字段。';
+
+  @override
+  String errorRuleNeedsCompletion(String rule) {
+    return '规则“$rule”需要一个用于标记完成的字段。';
+  }
+
+  @override
+  String errorRuleNeedsParam(String rule, String param) {
+    return '规则“$rule”：缺少“$param”。';
+  }
+
+  @override
+  String errorRuleParamNotField(String rule, String param, String field) {
+    return '规则“$rule”的“$param”：“$field”不是此列表的字段。';
+  }
+
+  @override
+  String errorRuleParamWrongType(
+    String rule,
+    String param,
+    String field,
+    String types,
+  ) {
+    return '规则“$rule”的“$param”：“$field”必须是 $types 类型。';
+  }
+
+  @override
+  String errorRuleUnknownField(String rule, String param, String field) {
+    return '规则“$rule”的“$param”：没有字段“$field”。';
+  }
+
+  @override
+  String errorRuleValueNotOption(
+    String rule,
+    String param,
+    String value,
+    String field,
+  ) {
+    return '规则“$rule”的“$param”：“$value”不是“$field”的选项。';
+  }
+
+  @override
+  String errorRuleParamNotOption(String rule, String param, String field) {
+    return '规则“$rule”：“$param”必须是“$field”的选项。';
+  }
+
+  @override
+  String get errorWrongList => '此条目属于另一个列表。';
+
+  @override
+  String errorFieldRequired(String field) {
+    return '“$field”为必填项。';
+  }
+
+  @override
+  String errorWrongValueType(String field, String type) {
+    return '“$field”：值不符合 $type 类型。';
+  }
+
+  @override
+  String errorValueEmpty(String field) {
+    return '“$field”不能为空。';
+  }
+
+  @override
+  String errorBelowMin(String field, String min) {
+    return '“$field”必须至少为 $min。';
+  }
+
+  @override
+  String errorAboveMax(String field, String max) {
+    return '“$field”不能超过 $max。';
+  }
+
+  @override
+  String errorNotAnOption(String field, String value) {
+    return '“$field”：“$value”不在选项中。';
+  }
+
+  @override
+  String errorBadSubItem(String field) {
+    return '“$field”：每个子项都需要标题和完成标记。';
+  }
+
+  @override
+  String errorUnknownFrequency(String field, String value) {
+    return '“$field”：未知的重复方式“$value”。';
+  }
+
+  @override
+  String errorCustomDaysMissing(String field) {
+    return '“$field”：自定义重复需要大于 0 的天数。';
+  }
+
+  @override
+  String errorOpNoField(String field) {
+    return '没有字段“$field”。';
+  }
+
+  @override
+  String errorFieldExists(String field) {
+    return '键为“$field”的字段已存在。';
+  }
+
+  @override
+  String errorUnknownFieldType(String type) {
+    return '未知的字段类型“$type”。';
+  }
+
+  @override
+  String errorBadOp(String detail) {
+    return '无法读取一项更改：$detail';
+  }
+
+  @override
+  String get errorListExists => '已存在具有此 ID 的列表。';
+
+  @override
+  String get errorDuplicateItemId => '两个条目的 ID 相同。';
+
+  @override
+  String get errorItemIdTaken => '某个条目的 ID 已被另一个列表使用。';
+
+  @override
+  String get errorItemInOtherList => '有条目属于另一个列表。';
+
+  @override
+  String get errorBuiltinOnlyInfo => '内置列表只能修改名称、图标、颜色和 AI 设置。';
 }

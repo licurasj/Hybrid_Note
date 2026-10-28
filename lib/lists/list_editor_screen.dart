@@ -726,7 +726,7 @@ class _ListEditorScreenState extends State<ListEditorScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 16),
               child: Text(
-                _result.errors.join('\n'),
+                _result.errors.map((error) => labels.error(error, _result.definition)).join('\n'),
                 key: const ValueKey('editor-errors'),
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),

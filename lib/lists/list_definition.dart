@@ -1,3 +1,4 @@
+import 'list_error.dart';
 import 'list_vocabulary.dart';
 
 // A list type described as data: its fields, how it is shown and which
@@ -430,109 +431,117 @@ class ListDefinition {
   }
 
   // Problems that make this definition unusable; empty when it is valid.
-  List<String> validate() {
-    final List<String> errors = [];
+  List<ListError> validate() {
+    final List<ListError> errors = [];
     final Set<String> keys = {};
 
     if (formatVersion > currentFormatVersion) {
-      errors.add('formatVersion $formatVersion is newer than this app supports');
+      errors.add(ListError(ListErrorCode.formatTooNew, {'version': '$formatVersion'}));
     }
 
     if (id.trim().isEmpty) {
-      errors.add('id is empty');
+      errors.add(const ListError(ListErrorCode.emptyId));
     }
 
     if ((name == null || name!.trim().isEmpty) && nameKey == null) {
-      errors.add('list needs a name or nameKey');
+      errors.add(const ListError(ListErrorCode.missingName));
     }
 
     if (!RegExp(r'^#[0-9A-Fa-f]{6}$').hasMatch(color)) {
-      errors.add('color must look like #RRGGBB');
+      errors.add(const ListError(ListErrorCode.badColor));
     }
 
     if (fields.isEmpty) {
-      errors.add('list has no fields');
+      errors.add(const ListError(ListErrorCode.noFields));
     }
 
     for (final FieldDefinition field in fields) {
-      final String where = 'field "${field.key}"';
+      void fieldError(ListErrorCode code, [Map<String, String> args = const {}]) {
+        errors.add(ListError(code, {'field': field.key, ...args}));
+      }
 
       if (!RegExp(r'^[A-Za-z][A-Za-z0-9_]*$').hasMatch(field.key)) {
-        errors.add('$where: key must start with a letter and use letters, digits or _');
+        fieldError(ListErrorCode.badFieldKey);
       }
 
       if (itemMetaFields.contains(field.key)) {
-        errors.add('$where: key is reserved for item metadata');
+        fieldError(ListErrorCode.reservedFieldKey);
       }
 
       if (!keys.add(field.key)) {
-        errors.add('$where: duplicate key');
+        fieldError(ListErrorCode.duplicateFieldKey);
       }
 
       if (field.label == null && field.labelKey == null) {
-        errors.add('$where: needs a label or labelKey');
+        fieldError(ListErrorCode.missingFieldLabel);
       }
 
       if (field.type.needsOptions && field.options.isEmpty) {
-        errors.add('$where: enum field needs options');
+        fieldError(ListErrorCode.missingOptions);
       }
 
       if (field.options.isNotEmpty &&
           !field.type.needsOptions &&
           !field.type.hasUserOptions) {
-        errors.add('$where: ${field.type.wire} fields cannot have options');
+        fieldError(ListErrorCode.optionsNotAllowed, {'type': field.type.wire});
       }
 
       final Set<String> optionValues = {};
       for (final FieldOption option in field.options) {
         if (!optionValues.add(option.value)) {
-          errors.add('$where: duplicate option "${option.value}"');
+          fieldError(ListErrorCode.duplicateOption, {'option': option.value});
         }
       }
 
       if (field.type == FieldType.choice &&
           field.defaultValue != null &&
           !field.hasOption(field.defaultValue)) {
-        errors.add('$where: default is not one of the options');
+        fieldError(ListErrorCode.defaultNotOption);
       }
 
       if (field.min != null && field.max != null && field.min! > field.max!) {
-        errors.add('$where: min is greater than max');
+        fieldError(ListErrorCode.minAboveMax);
       }
 
       final FieldCondition? condition = field.visibleWhen;
       if (condition != null) {
         final FieldDefinition? target = this.field(condition.field);
         if (target == null || target.type != FieldType.choice) {
-          errors.add('$where: visibleWhen must name an enum field');
+          fieldError(ListErrorCode.conditionNotChoice);
         } else if (condition.field == field.key) {
-          errors.add('$where: visibleWhen cannot name the field itself');
+          fieldError(ListErrorCode.conditionOnItself);
         } else {
           for (final String value in condition.values) {
             if (!target.hasOption(value)) {
-              errors.add('$where: visibleWhen "$value" is not an option of "${target.key}"');
+              fieldError(
+                ListErrorCode.conditionNotOption,
+                {'value': value, 'target': target.key},
+              );
             }
           }
         }
       }
 
-      final String? roleError = _roleError(field);
-      if (roleError != null) {
-        errors.add('$where: $roleError');
+      final FieldType? roleType = _roleType(field.role);
+      if (roleType != null && field.type != roleType) {
+        fieldError(
+          ListErrorCode.roleNeedsType,
+          {'role': field.role!.wire, 'type': roleType.wire},
+        );
       }
     }
 
     final List<FieldDefinition> primaries =
         fields.where((field) => field.primary).toList();
     if (primaries.length != 1) {
-      errors.add('exactly one field must be primary');
+      errors.add(const ListError(ListErrorCode.primaryCount));
     } else if (primaries.single.type != FieldType.text) {
-      errors.add('the primary field must be text');
+      errors.add(const ListError(ListErrorCode.primaryNotText));
     }
 
     for (final FieldRole role in FieldRole.values) {
       if (fields.where((field) => field.role == role).length > 1) {
-        errors.add('more than one field has role ${role.wire}');
+        errors.add(ListError(ListErrorCode.duplicateRole, {'role': role.wire}));
       }
     }
 
@@ -545,51 +554,53 @@ class ListDefinition {
     return errors;
   }
 
-  String? _roleError(FieldDefinition field) {
-    switch (field.role) {
+  // The field type a role needs.
+  static FieldType? _roleType(FieldRole? role) {
+    switch (role) {
       case null:
         return null;
       case FieldRole.completion:
-        return field.type == FieldType.checkbox
-            ? null
-            : 'completion role needs a checkbox field';
+        return FieldType.checkbox;
       case FieldRole.reminder:
-        return field.type == FieldType.dateTime
-            ? null
-            : 'reminder role needs a dateTime field';
+        return FieldType.dateTime;
       case FieldRole.status:
       case FieldRole.section:
-        return field.type == FieldType.choice
-            ? null
-            : '${field.role!.wire} role needs an enum field';
+        return FieldType.choice;
       case FieldRole.category:
-        return field.type == FieldType.category
-            ? null
-            : 'category role needs a category field';
+        return FieldType.category;
     }
   }
 
-  List<String> _viewErrors() {
-    final List<String> errors = [];
+  List<ListError> _viewErrors() {
+    final List<ListError> errors = [];
 
     void expectField(String? key, String param, Set<FieldType> types) {
       if (key == null) {
-        errors.add('view ${view.kind.wire} needs $param');
+        errors.add(ListError(
+          ListErrorCode.viewNeedsParam,
+          {'view': view.kind.wire, 'param': param},
+        ));
         return;
       }
 
       final FieldDefinition? target = field(key);
       if (target == null) {
-        errors.add('view $param "$key" is not a field');
+        errors.add(ListError(
+          ListErrorCode.viewParamNotField,
+          {'param': param, 'field': key},
+        ));
       } else if (!types.contains(target.type)) {
-        errors.add('view $param "$key" must be ${_typeNames(types)}');
+        errors.add(ListError(
+          ListErrorCode.viewParamWrongType,
+          {'param': param, 'field': key, 'types': _typeWires(types)},
+        ));
       }
     }
 
     switch (view.kind) {
       case ViewKind.checklist:
         if (fieldWithRole(FieldRole.completion) == null) {
-          errors.add('checklist view needs a field with the completion role');
+          errors.add(const ListError(ListErrorCode.checklistNeedsCompletion));
         }
       case ViewKind.sectioned:
         expectField(view.sectionBy, 'sectionBy', {FieldType.choice});
@@ -601,9 +612,7 @@ class ListDefinition {
         );
       case ViewKind.timeline:
         final String? dateField = view.dateField;
-        if (dateField == null) {
-          errors.add('timeline view needs dateField');
-        } else if (!itemMetaFields.contains(dateField)) {
+        if (dateField == null || !itemMetaFields.contains(dateField)) {
           expectField(
             dateField,
             'dateField',
@@ -634,25 +643,31 @@ class ListDefinition {
     return errors;
   }
 
-  List<String> _behaviorErrors(BehaviorDefinition behavior) {
-    final List<String> errors = [];
-    final String where = 'behavior ${behavior.kind.wire}';
+  List<ListError> _behaviorErrors(BehaviorDefinition behavior) {
+    final List<ListError> errors = [];
+
+    void ruleError(ListErrorCode code, [Map<String, String> args = const {}]) {
+      errors.add(ListError(code, {'rule': behavior.kind.wire, ...args}));
+    }
 
     FieldDefinition? expectField(String param, Set<FieldType> types) {
       final String? key = behavior.stringParam(param);
       if (key == null) {
-        errors.add('$where: needs $param');
+        ruleError(ListErrorCode.ruleNeedsParam, {'param': param});
         return null;
       }
 
       final FieldDefinition? target = field(key);
       if (target == null) {
-        errors.add('$where: $param "$key" is not a field');
+        ruleError(ListErrorCode.ruleParamNotField, {'param': param, 'field': key});
         return null;
       }
 
       if (!types.contains(target.type)) {
-        errors.add('$where: $param "$key" must be ${_typeNames(types)}');
+        ruleError(
+          ListErrorCode.ruleParamWrongType,
+          {'param': param, 'field': key, 'types': _typeWires(types)},
+        );
         return null;
       }
 
@@ -663,10 +678,16 @@ class ListDefinition {
       for (final MapEntry<String, dynamic> entry in values.entries) {
         final FieldDefinition? target = field(entry.key);
         if (target == null) {
-          errors.add('$where: $param names unknown field "${entry.key}"');
+          ruleError(
+            ListErrorCode.ruleUnknownField,
+            {'param': param, 'field': entry.key},
+          );
         } else if (target.type == FieldType.choice &&
             !target.hasOption(entry.value)) {
-          errors.add('$where: $param "${entry.value}" is not an option of "${entry.key}"');
+          ruleError(
+            ListErrorCode.ruleValueNotOption,
+            {'param': param, 'value': '${entry.value}', 'field': entry.key},
+          );
         }
       }
     }
@@ -674,7 +695,7 @@ class ListDefinition {
     // Every rule except moveAll acts when completed items are cleared.
     if (behavior.kind != BehaviorKind.moveAll &&
         fieldWithRole(FieldRole.completion) == null) {
-      errors.add('$where: needs a field with the completion role');
+      ruleError(ListErrorCode.ruleNeedsCompletion);
     }
 
     switch (behavior.kind) {
@@ -686,7 +707,7 @@ class ListDefinition {
         expectValues(behavior.mapParam('where'), 'where');
         final Map<String, dynamic> setField = behavior.mapParam('setField');
         if (setField.isEmpty) {
-          errors.add('$where: needs setField');
+          ruleError(ListErrorCode.ruleNeedsParam, {'param': 'setField'});
         }
         expectValues(setField, 'setField');
         if (behavior.params['dedupeBy'] != null) {
@@ -697,7 +718,10 @@ class ListDefinition {
         if (target != null) {
           for (final String param in ['from', 'to']) {
             if (!target.hasOption(behavior.params[param])) {
-              errors.add('$where: $param must be an option of "${target.key}"');
+              ruleError(
+                ListErrorCode.ruleParamNotOption,
+                {'param': param, 'field': target.key},
+              );
             }
           }
         }
@@ -708,8 +732,8 @@ class ListDefinition {
     return errors;
   }
 
-  static String _typeNames(Set<FieldType> types) {
-    return types.map((type) => type.wire).join(' or ');
+  static String _typeWires(Set<FieldType> types) {
+    return types.map((type) => type.wire).join('|');
   }
 }
 

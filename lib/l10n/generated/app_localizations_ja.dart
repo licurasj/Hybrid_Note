@@ -545,4 +545,243 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get moveHub => '移動';
+
+  @override
+  String errorFormatTooNew(String version) {
+    return 'このリストは新しいバージョンのアプリで作成されています（形式 $version）。';
+  }
+
+  @override
+  String get errorEmptyId => 'リストに ID がありません。';
+
+  @override
+  String get errorMissingName => 'リストには名前が必要です。';
+
+  @override
+  String get errorBadColor => '色は #RRGGBB の形式にしてください。';
+
+  @override
+  String get errorNoFields => 'リストには項目が 1 つ以上必要です。';
+
+  @override
+  String get errorPrimaryCount => 'メイン項目はちょうど 1 つにしてください。';
+
+  @override
+  String get errorPrimaryNotText => 'メイン項目はテキストにしてください。';
+
+  @override
+  String errorDuplicateRole(String role) {
+    return '役割 $role を持てる項目は 1 つだけです。';
+  }
+
+  @override
+  String errorBadFieldKey(String field) {
+    return '項目キー「$field」は英字で始め、英字・数字・_ だけを使ってください。';
+  }
+
+  @override
+  String errorReservedFieldKey(String field) {
+    return '項目キー「$field」は予約されています。';
+  }
+
+  @override
+  String errorDuplicateFieldKey(String field) {
+    return '2 つの項目がキー「$field」を使っています。';
+  }
+
+  @override
+  String errorMissingFieldLabel(String field) {
+    return '項目「$field」には名前が必要です。';
+  }
+
+  @override
+  String errorMissingOptions(String field) {
+    return '項目「$field」には選択肢が 1 つ以上必要です。';
+  }
+
+  @override
+  String errorOptionsNotAllowed(String field, String type) {
+    return '項目「$field」: 種類「$type」の項目には選択肢を設定できません。';
+  }
+
+  @override
+  String errorDuplicateOption(String field, String option) {
+    return '項目「$field」: 選択肢「$option」が重複しています。';
+  }
+
+  @override
+  String errorDefaultNotOption(String field) {
+    return '項目「$field」: 既定値が選択肢にありません。';
+  }
+
+  @override
+  String errorMinAboveMax(String field) {
+    return '項目「$field」: 最小値が最大値より大きくなっています。';
+  }
+
+  @override
+  String errorConditionNotChoice(String field) {
+    return '項目「$field」は選択項目にしか連動できません。';
+  }
+
+  @override
+  String errorConditionOnItself(String field) {
+    return '項目「$field」は自分自身に連動できません。';
+  }
+
+  @override
+  String errorConditionNotOption(String field, String value, String target) {
+    return '項目「$field」: 「$value」は「$target」の選択肢ではありません。';
+  }
+
+  @override
+  String errorRoleNeedsType(String field, String role, String type) {
+    return '項目「$field」: 役割 $role には種類「$type」が必要です。';
+  }
+
+  @override
+  String errorViewNeedsParam(String view, String param) {
+    return 'レイアウト「$view」には「$param」の項目が必要です。';
+  }
+
+  @override
+  String errorViewParamNotField(String param, String field) {
+    return '「$param」: 「$field」はこのリストの項目ではありません。';
+  }
+
+  @override
+  String errorViewParamWrongType(String param, String field, String types) {
+    return '「$param」: 「$field」の種類は $types にしてください。';
+  }
+
+  @override
+  String get errorChecklistNeedsCompletion => 'チェックリストのレイアウトには完了を示す項目が必要です。';
+
+  @override
+  String errorRuleNeedsCompletion(String rule) {
+    return 'ルール「$rule」には完了を示す項目が必要です。';
+  }
+
+  @override
+  String errorRuleNeedsParam(String rule, String param) {
+    return 'ルール「$rule」: 「$param」がありません。';
+  }
+
+  @override
+  String errorRuleParamNotField(String rule, String param, String field) {
+    return 'ルール「$rule」の「$param」: 「$field」はこのリストの項目ではありません。';
+  }
+
+  @override
+  String errorRuleParamWrongType(
+    String rule,
+    String param,
+    String field,
+    String types,
+  ) {
+    return 'ルール「$rule」の「$param」: 「$field」の種類は $types にしてください。';
+  }
+
+  @override
+  String errorRuleUnknownField(String rule, String param, String field) {
+    return 'ルール「$rule」の「$param」: 項目「$field」はありません。';
+  }
+
+  @override
+  String errorRuleValueNotOption(
+    String rule,
+    String param,
+    String value,
+    String field,
+  ) {
+    return 'ルール「$rule」の「$param」: 「$value」は「$field」の選択肢ではありません。';
+  }
+
+  @override
+  String errorRuleParamNotOption(String rule, String param, String field) {
+    return 'ルール「$rule」: 「$param」は「$field」の選択肢にしてください。';
+  }
+
+  @override
+  String get errorWrongList => 'このエントリは別のリストのものです。';
+
+  @override
+  String errorFieldRequired(String field) {
+    return '「$field」は必須です。';
+  }
+
+  @override
+  String errorWrongValueType(String field, String type) {
+    return '「$field」: 値が種類「$type」に合いません。';
+  }
+
+  @override
+  String errorValueEmpty(String field) {
+    return '「$field」を空にすることはできません。';
+  }
+
+  @override
+  String errorBelowMin(String field, String min) {
+    return '「$field」は $min 以上にしてください。';
+  }
+
+  @override
+  String errorAboveMax(String field, String max) {
+    return '「$field」は $max 以下にしてください。';
+  }
+
+  @override
+  String errorNotAnOption(String field, String value) {
+    return '「$field」: 「$value」は選択肢にありません。';
+  }
+
+  @override
+  String errorBadSubItem(String field) {
+    return '「$field」: サブ項目にはタイトルと完了マークが必要です。';
+  }
+
+  @override
+  String errorUnknownFrequency(String field, String value) {
+    return '「$field」: 不明な繰り返し「$value」です。';
+  }
+
+  @override
+  String errorCustomDaysMissing(String field) {
+    return '「$field」: カスタムの繰り返しには 1 日以上の日数が必要です。';
+  }
+
+  @override
+  String errorOpNoField(String field) {
+    return '項目「$field」はありません。';
+  }
+
+  @override
+  String errorFieldExists(String field) {
+    return 'キー「$field」の項目はすでにあります。';
+  }
+
+  @override
+  String errorUnknownFieldType(String type) {
+    return '不明な項目の種類「$type」です。';
+  }
+
+  @override
+  String errorBadOp(String detail) {
+    return '変更を読み取れませんでした: $detail';
+  }
+
+  @override
+  String get errorListExists => 'この ID のリストはすでにあります。';
+
+  @override
+  String get errorDuplicateItemId => '2 つのエントリが同じ ID を持っています。';
+
+  @override
+  String get errorItemIdTaken => 'エントリの ID が別のリストですでに使われています。';
+
+  @override
+  String get errorItemInOtherList => '別のリストのエントリが含まれています。';
+
+  @override
+  String get errorBuiltinOnlyInfo => '組み込みリストで変更できるのは名前・アイコン・色・AI 設定だけです。';
 }

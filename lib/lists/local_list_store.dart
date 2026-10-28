@@ -9,6 +9,7 @@ import 'custom_lists.dart';
 import 'legacy_lists.dart';
 import 'list_catalog.dart';
 import 'list_definition.dart';
+import 'list_error.dart';
 import 'list_item.dart';
 import 'list_patch.dart';
 import 'list_rules.dart';
@@ -245,14 +246,14 @@ class LocalListStore implements ListStore {
   Future<void> refresh() => app.syncWithDrive();
 
   @override
-  Future<List<String>> createList(
+  Future<List<ListError>> createList(
     ListDefinition definition, {
     List<ListItem> items = const [],
   }) async {
     await _ready.future;
     if (_current.definition(definition.id) != null ||
         BuiltinTemplates.isBuiltin(definition.id)) {
-      return ['list "${definition.id}" already exists'];
+      return [ListError(ListErrorCode.listExists, {'list': definition.id})];
     }
     // Item ids must be unique: within the new list (one document per item
     // in Firestore) and, in this store, across every list, since item writes
@@ -261,19 +262,19 @@ class LocalListStore implements ListStore {
       for (final ListItem item in _current.items) item.id,
     };
     final Set<String> newIds = {};
-    final List<String> errors = [
+    final List<ListError> errors = [
       ...definition.validate(),
       for (final ListItem item in items)
         if (!newIds.add(item.id))
-          'item "${item.id}": duplicate id'
+          ListError(ListErrorCode.duplicateItemId, const {}, item.id)
         else if (usedIds.contains(item.id))
-          'item "${item.id}": id already used by another list',
+          ListError(ListErrorCode.itemIdTaken, const {}, item.id),
       for (final ListItem item in items)
         if (item.listId != definition.id)
-          'item "${item.id}": belongs to list "${item.listId}"'
+          ListError(ListErrorCode.itemInOtherList, {'list': item.listId}, item.id)
         else
-          for (final String error in item.validateAgainst(definition))
-            'item "${item.id}": $error',
+          for (final ListError error in item.validateAgainst(definition))
+            error.forItem(item.id),
     ];
     if (errors.isEmpty) {
       await custom.createList(definition, items: items);
@@ -302,11 +303,13 @@ class LocalListStore implements ListStore {
     // only their name, icon, colour and AI switch can change. Anything else
     // is refused rather than dropped.
     if (BuiltinTemplates.isBuiltin(listId)) {
-      final List<String> refused = [
+      final List<ListError> refused = [
         for (final ListPatchOp op in ops)
           if (op.kind != PatchOpKind.setListInfo)
-            'built-in list "$listId": only setListInfo is supported, '
-                'not ${op.kind.wire}',
+            ListError(
+              ListErrorCode.builtinOnlyInfo,
+              {'list': listId, 'op': op.kind.wire},
+            ),
       ];
       if (refused.isNotEmpty) {
         return ListPatchResult(

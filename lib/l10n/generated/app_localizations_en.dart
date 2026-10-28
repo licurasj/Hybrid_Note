@@ -546,4 +546,246 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get moveHub => 'Move';
+
+  @override
+  String errorFormatTooNew(String version) {
+    return 'This list comes from a newer version of the app (format $version).';
+  }
+
+  @override
+  String get errorEmptyId => 'The list has no ID.';
+
+  @override
+  String get errorMissingName => 'The list needs a name.';
+
+  @override
+  String get errorBadColor => 'The color must look like #RRGGBB.';
+
+  @override
+  String get errorNoFields => 'The list needs at least one field.';
+
+  @override
+  String get errorPrimaryCount => 'Exactly one field must be the main field.';
+
+  @override
+  String get errorPrimaryNotText => 'The main field must be a text field.';
+
+  @override
+  String errorDuplicateRole(String role) {
+    return 'Only one field can have the role $role.';
+  }
+
+  @override
+  String errorBadFieldKey(String field) {
+    return 'Field key \"$field\" must start with a letter and use only letters, digits or _.';
+  }
+
+  @override
+  String errorReservedFieldKey(String field) {
+    return 'Field key \"$field\" is reserved.';
+  }
+
+  @override
+  String errorDuplicateFieldKey(String field) {
+    return 'Two fields use the key \"$field\".';
+  }
+
+  @override
+  String errorMissingFieldLabel(String field) {
+    return 'Field \"$field\" needs a name.';
+  }
+
+  @override
+  String errorMissingOptions(String field) {
+    return 'Field \"$field\" needs at least one option.';
+  }
+
+  @override
+  String errorOptionsNotAllowed(String field, String type) {
+    return 'Field \"$field\": $type fields cannot have options.';
+  }
+
+  @override
+  String errorDuplicateOption(String field, String option) {
+    return 'Field \"$field\": the option \"$option\" appears twice.';
+  }
+
+  @override
+  String errorDefaultNotOption(String field) {
+    return 'Field \"$field\": the default value is not one of the options.';
+  }
+
+  @override
+  String errorMinAboveMax(String field) {
+    return 'Field \"$field\": the minimum is greater than the maximum.';
+  }
+
+  @override
+  String errorConditionNotChoice(String field) {
+    return 'Field \"$field\" can only depend on a choice field.';
+  }
+
+  @override
+  String errorConditionOnItself(String field) {
+    return 'Field \"$field\" cannot depend on itself.';
+  }
+
+  @override
+  String errorConditionNotOption(String field, String value, String target) {
+    return 'Field \"$field\": \"$value\" is not an option of \"$target\".';
+  }
+
+  @override
+  String errorRoleNeedsType(String field, String role, String type) {
+    return 'Field \"$field\": the role $role needs the type $type.';
+  }
+
+  @override
+  String errorViewNeedsParam(String view, String param) {
+    return 'The $view layout needs a field for \"$param\".';
+  }
+
+  @override
+  String errorViewParamNotField(String param, String field) {
+    return '\"$param\": \"$field\" is not a field of this list.';
+  }
+
+  @override
+  String errorViewParamWrongType(String param, String field, String types) {
+    return '\"$param\": \"$field\" must be of type $types.';
+  }
+
+  @override
+  String get errorChecklistNeedsCompletion =>
+      'The checklist layout needs a field that marks items as done.';
+
+  @override
+  String errorRuleNeedsCompletion(String rule) {
+    return 'Rule \"$rule\" needs a field that marks items as done.';
+  }
+
+  @override
+  String errorRuleNeedsParam(String rule, String param) {
+    return 'Rule \"$rule\": \"$param\" is missing.';
+  }
+
+  @override
+  String errorRuleParamNotField(String rule, String param, String field) {
+    return 'Rule \"$rule\", \"$param\": \"$field\" is not a field of this list.';
+  }
+
+  @override
+  String errorRuleParamWrongType(
+    String rule,
+    String param,
+    String field,
+    String types,
+  ) {
+    return 'Rule \"$rule\", \"$param\": \"$field\" must be of type $types.';
+  }
+
+  @override
+  String errorRuleUnknownField(String rule, String param, String field) {
+    return 'Rule \"$rule\", \"$param\": there is no field \"$field\".';
+  }
+
+  @override
+  String errorRuleValueNotOption(
+    String rule,
+    String param,
+    String value,
+    String field,
+  ) {
+    return 'Rule \"$rule\", \"$param\": \"$value\" is not an option of \"$field\".';
+  }
+
+  @override
+  String errorRuleParamNotOption(String rule, String param, String field) {
+    return 'Rule \"$rule\": \"$param\" must be an option of \"$field\".';
+  }
+
+  @override
+  String get errorWrongList => 'This item belongs to another list.';
+
+  @override
+  String errorFieldRequired(String field) {
+    return '\"$field\" is required.';
+  }
+
+  @override
+  String errorWrongValueType(String field, String type) {
+    return '\"$field\": the value does not fit the type $type.';
+  }
+
+  @override
+  String errorValueEmpty(String field) {
+    return '\"$field\" must not be empty.';
+  }
+
+  @override
+  String errorBelowMin(String field, String min) {
+    return '\"$field\" must be at least $min.';
+  }
+
+  @override
+  String errorAboveMax(String field, String max) {
+    return '\"$field\" must be at most $max.';
+  }
+
+  @override
+  String errorNotAnOption(String field, String value) {
+    return '\"$field\": \"$value\" is not one of the options.';
+  }
+
+  @override
+  String errorBadSubItem(String field) {
+    return '\"$field\": each sub-item needs a title and a done mark.';
+  }
+
+  @override
+  String errorUnknownFrequency(String field, String value) {
+    return '\"$field\": unknown repeat \"$value\".';
+  }
+
+  @override
+  String errorCustomDaysMissing(String field) {
+    return '\"$field\": a custom repeat needs a number of days above 0.';
+  }
+
+  @override
+  String errorOpNoField(String field) {
+    return 'There is no field \"$field\".';
+  }
+
+  @override
+  String errorFieldExists(String field) {
+    return 'A field with the key \"$field\" already exists.';
+  }
+
+  @override
+  String errorUnknownFieldType(String type) {
+    return 'Unknown field type \"$type\".';
+  }
+
+  @override
+  String errorBadOp(String detail) {
+    return 'A change could not be read: $detail';
+  }
+
+  @override
+  String get errorListExists => 'A list with this ID already exists.';
+
+  @override
+  String get errorDuplicateItemId => 'Two items have the same ID.';
+
+  @override
+  String get errorItemIdTaken =>
+      'An item\'s ID is already used by another list.';
+
+  @override
+  String get errorItemInOtherList => 'An item belongs to another list.';
+
+  @override
+  String get errorBuiltinOnlyInfo =>
+      'Built-in lists can only change their name, icon, color and AI setting.';
 }

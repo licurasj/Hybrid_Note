@@ -195,14 +195,14 @@ void main() {
 
     test('an option that does not exist', () {
       expect(
-        watchItem({'status': 'abandoned'}).validateAgainst(watch),
+        watchItem({'status': 'abandoned'}).validateAgainst(watch).map((error) => '$error'),
         contains(contains('"abandoned" is not an option')),
       );
     });
 
     test('a counter below its minimum', () {
       expect(
-        watchItem({'season': -1}).validateAgainst(watch),
+        watchItem({'season': -1}).validateAgainst(watch).map((error) => '$error'),
         contains(contains('must be at least 0')),
       );
     });
@@ -217,7 +217,7 @@ void main() {
       );
 
       expect(
-        item.validateAgainst(watch),
+        item.validateAgainst(watch).map((error) => '$error'),
         contains('field "title" is required'),
       );
     });
@@ -240,7 +240,7 @@ void main() {
       );
 
       expect(
-        item.validateAgainst(tasks),
+        item.validateAgainst(tasks).map((error) => '$error'),
         contains(contains('custom frequency needs customDays')),
       );
     });

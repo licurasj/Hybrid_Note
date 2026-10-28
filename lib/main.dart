@@ -16,6 +16,7 @@ import 'lists/list_catalog.dart';
 import 'lists/list_catalog_builder.dart';
 import 'lists/list_definition.dart';
 import 'lists/list_editor_screen.dart';
+import 'lists/list_error.dart';
 import 'lists/list_icons.dart';
 import 'lists/list_labels.dart';
 import 'lists/list_patch.dart';
@@ -353,7 +354,7 @@ class _MainShellState extends State<MainShell> {
       return;
     }
 
-    final List<String> errors = await context.read<ListStore>().createList(
+    final List<ListError> errors = await context.read<ListStore>().createList(
       result.definition,
     );
     if (mounted && errors.isEmpty) {
