@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,8 +20,8 @@ final DateTime _t0 = DateTime.utc(2026, 3, 1);
 
 // A Firestore holding the four built-in definitions, as the Block B
 // switch-over writes them for a new user.
-Future<FakeFirebaseFirestore> _seeded() async {
-  final FakeFirebaseFirestore firestore = FakeFirebaseFirestore();
+Future<T> _seeded<T extends FakeFirebaseFirestore>([T? into]) async {
+  final T firestore = into ?? FakeFirebaseFirestore() as T;
   for (final ListDefinition definition in BuiltinTemplates.all()) {
     await firestore
         .doc('users/$_uid/lists/${definition.id}')
@@ -33,17 +34,72 @@ Future<FirestoreListStore> _loaded(
   FakeFirebaseFirestore firestore, {
   void Function(String path, Object error)? onSkipped,
   int batchLimit = FirestoreListStore.maxBatchWrites,
+  Duration transactionTimeout = const Duration(seconds: 10),
 }) async {
   final FirestoreListStore store = FirestoreListStore(
     firestore,
     _uid,
     onSkipped: onSkipped,
     batchLimit: batchLimit,
+    transactionTimeout: transactionTimeout,
   );
   addTearDown(store.close);
   await store.watch().first.timeout(const Duration(seconds: 10));
   return store;
 }
+
+// fake_cloud_firestore runs a transaction's writes straight away and never
+// retries it; this one can also run a write of "another device" first, fail
+// like an offline client or never finish.
+class _ScriptedFirestore extends FakeFirebaseFirestore {
+  int transactions = 0;
+  Future<void> Function()? beforeTransaction;
+  Object? failWith;
+  bool hang = false;
+
+  @override
+  Future<T> runTransaction<T>(
+    TransactionHandler<T> transactionHandler, {
+    Duration timeout = const Duration(seconds: 30),
+    int maxAttempts = 5,
+  }) async {
+    transactions++;
+    await beforeTransaction?.call();
+    final Object? failure = failWith;
+    if (failure != null) {
+      throw failure;
+    }
+    if (hang) {
+      return Completer<T>().future;
+    }
+    return super.runTransaction(
+      transactionHandler,
+      timeout: timeout,
+      maxAttempts: maxAttempts,
+    );
+  }
+}
+
+Future<Map<String, dynamic>> _doc(
+  FakeFirebaseFirestore firestore,
+  String path,
+) async {
+  return (await firestore.doc('users/$_uid/lists/$path').get()).data()!;
+}
+
+ListItem _kind(String id, Object kind) {
+  return ListItem(
+    id: id,
+    listId: 'list-a',
+    values: {'title': id, 'kind': kind},
+    createdAt: _t0,
+    updatedAt: _t0,
+  );
+}
+
+const List<ListPatchOp> _toCounter = [
+  ListPatchOp(PatchOpKind.changeFieldType, {'key': 'kind', 'type': 'counter'}),
+];
 
 Future<ListCatalog> _until(ListStore store, bool Function(ListCatalog c) test) {
   return store.watch().firstWhere(test).timeout(const Duration(seconds: 10));
@@ -189,7 +245,11 @@ void main() {
       final itemDoc = await firestore
           .doc('users/$_uid/lists/list-a/items/list-a-item-1')
           .get();
-      expect(itemDoc.data(), _row('list-a', 1).toJson());
+      // Plus `_rev`, the list revision the item was written for (Q-16).
+      expect(itemDoc.data(), {
+        ..._row('list-a', 1).toJson(),
+        '_rev': list.schemaRevision,
+      });
     });
 
     test(
@@ -478,10 +538,8 @@ void main() {
       expect(store.current.definition('list-x'), isNull);
     });
 
-    // The acceptance test for Q-16 (T-14): device B adds an item while
-    // device A's patch is running against a cache that does not have it yet.
-    // The provisional patchList misses that item; whichever strategy the
-    // owner picks must end with it migrated too.
+    // Q-16: device B adds an item while device A patches the list; however
+    // the two interleave, the item ends up fitting the new schema.
     test(
       'two clients: an item inserted during a patch is migrated as well',
       () async {
@@ -534,7 +592,329 @@ void main() {
           unorderedEquals([1, 2]),
         );
       },
-      skip: 'Q-16 open: patchList is provisional (T-14 unit 3)',
     );
+
+    test(
+      'two clients: an item the transaction cannot see is repaired',
+      () async {
+        final _ScriptedFirestore firestore = await _seeded(
+          _ScriptedFirestore(),
+        );
+        final FirestoreListStore a = await _loaded(firestore);
+        await a.createList(_simple('list-a'), items: [_kind('one', '1')]);
+        final FirestoreListStore b = await _loaded(firestore);
+        await _until(b, (c) => c.itemsOf('list-a').length == 1);
+
+        // B's insert lands after A has taken its item ids, before A's
+        // transaction reads: the transaction does not see it.
+        firestore.beforeTransaction = () async {
+          firestore.beforeTransaction = null;
+          await b.apply(ListChanges(saved: [_kind('two', '2')]));
+        };
+        final ListPatchResult? result = await a.patchList('list-a', _toCounter);
+        expect(result!.errors, isEmpty);
+        expect(result.items.map((i) => i.id), ['one']);
+
+        for (final FirestoreListStore store in [a, b]) {
+          await _until(
+            store,
+            (c) =>
+                c.itemsOf('list-a').length == 2 &&
+                c.itemsOf('list-a').every((i) => i['kind'] is int),
+          );
+        }
+        final Map<String, dynamic> two = await _doc(
+          firestore,
+          'list-a/items/two',
+        );
+        expect((two['values'] as Map)['kind'], 2);
+        expect(two['_rev'], result.definition.schemaRevision);
+      },
+    );
+
+    test('a patch runs on the list as stored, not a stale cache', () async {
+      final _ScriptedFirestore firestore = await _seeded(_ScriptedFirestore());
+      final FirestoreListStore a = await _loaded(firestore);
+      await a.createList(_simple('list-a'));
+      await _until(a, (c) => c.definition('list-a') != null);
+
+      // Another device adds a field just before A's transaction reads.
+      final ListDefinition other = ListPatch.apply(
+        _simple('list-a'),
+        const [],
+        const [
+          ListPatchOp(PatchOpKind.addField, {
+            'field': {'key': 'other', 'type': 'text', 'label': 'Other'},
+          }),
+        ],
+        _t0,
+      ).definition;
+      firestore.beforeTransaction = () async {
+        firestore.beforeTransaction = null;
+        await firestore.doc('users/$_uid/lists/list-a').set(other.toJson());
+      };
+      final ListPatchResult? result = await a.patchList('list-a', const [
+        ListPatchOp(PatchOpKind.addField, {
+          'field': {'key': 'mine', 'type': 'text', 'label': 'Mine'},
+        }),
+      ]);
+      expect(firestore.transactions, 1);
+      expect(result!.errors, isEmpty);
+      final ListDefinition stored = ListDefinition.fromJson(
+        await _doc(firestore, 'list-a'),
+      );
+      expect(stored.fields.map((f) => f.key), containsAll(['other', 'mine']));
+      expect(stored.schemaRevision, other.schemaRevision + 1);
+    });
+
+    test('a patch refused in the transaction writes nothing', () async {
+      final _ScriptedFirestore firestore = await _seeded(_ScriptedFirestore());
+      final FirestoreListStore store = await _loaded(firestore);
+      await store.createList(_simple('list-a'), items: [_kind('one', 'x')]);
+      await _until(store, (c) => c.itemsOf('list-a').length == 1);
+
+      final ListPatchResult? result = await store.patchList('list-a', const [
+        ListPatchOp(PatchOpKind.removeField, {'key': 'missing'}),
+      ]);
+      expect(result!.isValid, isFalse);
+      expect(firestore.transactions, 1);
+      expect(await _doc(firestore, 'list-a'), _simple('list-a').toJson());
+    });
+
+    test(
+      'offline, a patch is applied to the cache and saved as a batch',
+      () async {
+        final _ScriptedFirestore firestore = await _seeded(
+          _ScriptedFirestore(),
+        );
+        final FirestoreListStore store = await _loaded(firestore);
+        await store.createList(
+          _simple('list-a'),
+          items: [_kind('one', '1'), _kind('two', 'many')],
+        );
+        await _until(store, (c) => c.itemsOf('list-a').length == 2);
+
+        firestore.failWith = FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'unavailable',
+        );
+        final ListPatchResult? result = await store.patchList(
+          'list-a',
+          _toCounter,
+        );
+        expect(result!.errors, isEmpty);
+        expect(result.hiddenValues, 1);
+
+        final ListCatalog catalog = await _until(
+          store,
+          (c) =>
+              c.definition('list-a')!.field('kind')!.type.wire == 'counter' &&
+              c.itemsOf('list-a').any((i) => i['kind'] == 1) &&
+              c.itemsOf('list-a').any((i) => i[ListPatch.legacyKey] != null),
+        );
+        expect(
+          catalog
+              .itemsOf('list-a')
+              .firstWhere((i) => i.id == 'two')[ListPatch.legacyKey],
+          {
+            'kind': ['many'],
+          },
+        );
+        final Map<String, dynamic> one = await _doc(
+          firestore,
+          'list-a/items/one',
+        );
+        expect(one['_rev'], result.definition.schemaRevision);
+
+        // Adding a category works offline too.
+        await store.createList(
+          ListDefinition.fromJson({
+            ..._simple('list-b').toJson(),
+            'fields': [
+              {
+                'key': 'title',
+                'type': 'text',
+                'label': 'Title',
+                'required': true,
+                'primary': true,
+              },
+              {'key': 'kind', 'type': 'category', 'label': 'Kind'},
+            ],
+          }),
+        );
+        await _until(store, (c) => c.definition('list-b') != null);
+        await store.addOption('list-b', 'kind', 'moss');
+        await _until(
+          store,
+          (c) => c
+              .definition('list-b')!
+              .field('kind')!
+              .options
+              .any((o) => o.value == 'moss'),
+        );
+      },
+    );
+
+    test(
+      'a transaction that does not finish in time falls back to a batch',
+      () async {
+        final _ScriptedFirestore firestore = await _seeded(
+          _ScriptedFirestore(),
+        );
+        final FirestoreListStore store = await _loaded(
+          firestore,
+          transactionTimeout: const Duration(milliseconds: 50),
+        );
+        await store.createList(_simple('list-a'), items: [_kind('one', '1')]);
+        await _until(store, (c) => c.itemsOf('list-a').length == 1);
+
+        firestore.hang = true;
+        final ListPatchResult? result = await store.patchList(
+          'list-a',
+          _toCounter,
+        );
+        expect(result!.errors, isEmpty);
+        await _until(store, (c) => c.itemsOf('list-a').single['kind'] == 1);
+      },
+    );
+
+    test('other Firestore errors are not taken for offline', () async {
+      final _ScriptedFirestore firestore = await _seeded(_ScriptedFirestore());
+      final FirestoreListStore store = await _loaded(firestore);
+      await store.createList(_simple('list-a'));
+      await _until(store, (c) => c.definition('list-a') != null);
+
+      firestore.failWith = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
+      await expectLater(
+        store.patchList('list-a', _toCounter),
+        throwsA(isA<FirebaseException>()),
+      );
+      await pumpEventQueue();
+      expect(await _doc(firestore, 'list-a'), _simple('list-a').toJson());
+    });
+
+    test(
+      'a patch changing more items than one transaction holds saves them all',
+      () async {
+        final _ScriptedFirestore firestore = await _seeded(
+          _ScriptedFirestore(),
+        );
+        final FirestoreListStore store = await _loaded(
+          firestore,
+          batchLimit: 10,
+        );
+        final List<ListItem> items = [
+          for (int n = 0; n < 25; n++) _kind('i$n', '$n'),
+        ];
+        await store.createList(_simple('list-a'), items: items);
+        await _until(store, (c) => c.itemsOf('list-a').length == 25);
+
+        final ListPatchResult? result = await store.patchList(
+          'list-a',
+          _toCounter,
+        );
+        expect(result!.changedItemIds, hasLength(25));
+        final QuerySnapshot<Map<String, dynamic>> stored = await firestore
+            .collection('users/$_uid/lists/list-a/items')
+            .get();
+        for (final QueryDocumentSnapshot<Map<String, dynamic>> doc
+            in stored.docs) {
+          expect((doc.data()['values'] as Map)['kind'], isA<int>());
+          expect(doc.data()['_rev'], result.definition.schemaRevision);
+        }
+      },
+    );
+
+    test(
+      'items written for an older revision are fitted to the fields and saved',
+      () async {
+        final FakeFirebaseFirestore firestore = await _seeded();
+        // The list is at revision 2 with kind as a counter; the items were
+        // written by a device that still had revision 1 (kind as text).
+        final ListDefinition current = ListPatch.apply(
+          _simple('list-a'),
+          const [],
+          _toCounter,
+          _t0,
+        ).definition;
+        expect(current.schemaRevision, 2);
+        await firestore.doc('users/$_uid/lists/list-a').set(current.toJson());
+        final String items = 'users/$_uid/lists/list-a/items';
+        await firestore.doc('$items/fits').set({
+          ..._kind('fits', '3').toJson(),
+          '_rev': 1,
+        });
+        await firestore.doc('$items/hides').set({
+          ..._kind('hides', 'many').toJson(),
+          '_rev': 1,
+        });
+        // No `_rev` at all counts as 0.
+        await firestore.doc('$items/bare').set(_kind('bare', '4').toJson());
+        // Up to date: left alone even though its value would convert.
+        await firestore.doc('$items/current').set({
+          ..._kind('current', '5').toJson(),
+          '_rev': 2,
+        });
+
+        final FirestoreListStore store = await _loaded(firestore);
+        final ListCatalog catalog = await _until(
+          store,
+          (c) =>
+              c.itemsOf('list-a').where((i) => i['kind'] is int).length == 2 &&
+              c.itemsOf('list-a').any((i) => i[ListPatch.legacyKey] != null),
+        );
+        expect(
+          catalog.itemsOf('list-a').firstWhere((i) => i.id == 'hides').values,
+          {
+            'title': 'hides',
+            ListPatch.legacyKey: {
+              'kind': ['many'],
+            },
+          },
+        );
+        expect(
+          catalog
+              .itemsOf('list-a')
+              .firstWhere((i) => i.id == 'current')['kind'],
+          '5',
+        );
+        for (final String id in ['fits', 'hides', 'bare']) {
+          expect(
+            (await firestore.doc('$items/$id').get()).data()!['_rev'],
+            2,
+            reason: id,
+          );
+        }
+        // A repair keeps the item's updatedAt: it is not a user edit.
+        expect(
+          catalog.itemsOf('list-a').firstWhere((i) => i.id == 'fits').updatedAt,
+          _t0,
+        );
+      },
+    );
+
+    test('an item that already fits is not rewritten by the repair', () async {
+      final FakeFirebaseFirestore firestore = await _seeded();
+      await firestore
+          .doc('users/$_uid/lists/list-a')
+          .set(
+            ListPatch.apply(
+              _simple('list-a'),
+              const [],
+              _toCounter,
+              _t0,
+            ).definition.toJson(),
+          );
+      final String path = 'users/$_uid/lists/list-a/items/ok';
+      await firestore.doc(path).set({..._kind('ok', 7).toJson(), '_rev': 1});
+
+      final FirestoreListStore store = await _loaded(firestore);
+      await pumpEventQueue();
+      expect(store.current.itemsOf('list-a').single['kind'], 7);
+      expect((await firestore.doc(path).get()).data()!['_rev'], 1);
+    });
   });
 }
