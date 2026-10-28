@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,8 +10,12 @@ import 'list_definition.dart';
 import 'list_item.dart';
 import 'list_patch.dart';
 import 'list_rules.dart';
+import 'list_store.dart';
+
+export 'list_store.dart' show DeletedList;
 
 // Lists the user creates, plus name/icon/colour changes to the built-in ones.
+// Screens reach it only through LocalListStore.
 // Kept in a local file of their own: the Drive sync only knows the four
 // built-in lists and would drop anything else. Until the move to Firestore
 // these lists therefore stay on this device.
@@ -121,21 +126,26 @@ class CustomListsStorage {
   }
 }
 
-// A deleted list, kept in memory so the Undo snackbar can bring it back (D-5).
-class DeletedList {
-  const DeletedList({required this.definition, required this.items});
-
-  final ListDefinition definition;
-  final List<ListItem> items;
-}
-
 class CustomListsCubit extends Cubit<CustomListsData> {
   CustomListsCubit(this.storage) : super(const CustomListsData());
 
   final CustomListsStorage storage;
 
+  final Completer<void> _loaded = Completer<void>();
+
+  // Completes once load() has finished, even when the file was empty or
+  // missing (which emits nothing new).
+  Future<void> get loaded => _loaded.future;
+  bool get isLoaded => _loaded.isCompleted;
+
   Future<void> load() async {
-    emit(await storage.load());
+    try {
+      emit(await storage.load());
+    } finally {
+      if (!_loaded.isCompleted) {
+        _loaded.complete();
+      }
+    }
   }
 
   Future<void> _save(CustomListsData data) async {

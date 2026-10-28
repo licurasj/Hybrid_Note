@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hybrid_note/app_cubit.dart';
 import 'package:hybrid_note/lists/custom_lists.dart';
+import 'package:hybrid_note/lists/local_list_store.dart';
 import 'package:hybrid_note/main.dart';
 
 import 'support/fakes.dart';
@@ -22,7 +23,8 @@ void main() {
               deviceId: 'test-device',
             )..loadData(),
           ),
-          BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())),
+          BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())..load()),
+          LocalListStore.provider(),
         ],
         child: const HybridNoteApp(),
       ),
@@ -56,7 +58,8 @@ void main() {
               deviceId: 'test-device',
             )..loadData(),
           ),
-          BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())),
+          BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())..load()),
+          LocalListStore.provider(),
         ],
         child: const HybridNoteApp(),
       ),

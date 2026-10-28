@@ -11,6 +11,7 @@ import 'package:hybrid_note/lists/list_definition.dart';
 import 'package:hybrid_note/lists/list_item.dart';
 import 'package:hybrid_note/lists/list_patch.dart';
 import 'package:hybrid_note/lists/list_rules.dart';
+import 'package:hybrid_note/lists/local_list_store.dart';
 
 import '../support/fakes.dart';
 
@@ -88,7 +89,7 @@ void main() {
     ];
     await cubit.savePatched(ListPatch.apply(tasks, const [], ops, _t0), ops);
 
-    final ListCatalog catalog = ListCatalog.from(AppState.initial('d'), cubit.state);
+    final ListCatalog catalog = LocalListStore.catalogOf(AppState.initial('d'), cubit.state);
     final ListDefinition shown = catalog.definition(BuiltinTemplates.tasksId)!;
     expect(shown.name, 'To do');
     expect(shown.color, '#E53935');
@@ -98,7 +99,7 @@ void main() {
 
   test('the catalog lists built-ins first, then the user lists', () async {
     await cubit.createList(_plants());
-    final ListCatalog catalog = ListCatalog.from(
+    final ListCatalog catalog = LocalListStore.catalogOf(
       AppState.initial('d').copyWith(data: AppData.empty('d')),
       cubit.state,
     );
