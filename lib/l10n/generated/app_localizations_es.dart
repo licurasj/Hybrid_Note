@@ -830,4 +830,8 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get tryAgain => 'Reintentar';
+
+  @override
+  String get listChangeNotSaved =>
+      'No se pudo guardar un cambio en una lista y se ha deshecho.';
 }

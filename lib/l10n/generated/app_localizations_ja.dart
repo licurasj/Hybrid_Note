@@ -823,4 +823,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get tryAgain => '再試行';
+
+  @override
+  String get listChangeNotSaved => 'リストの変更を保存できなかったため、元に戻しました。';
 }

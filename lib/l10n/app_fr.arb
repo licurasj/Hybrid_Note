@@ -300,5 +300,6 @@
   "signInOffline": "Pas de connexion. Connectez-vous à Internet pour vous connecter.",
   "signOutFailed": "La déconnexion a échoué. Veuillez réessayer.",
   "signOutCleanupFailed": "Déconnecté, mais les listes enregistrées sur cet appareil n'ont pas pu être supprimées.",
-  "tryAgain": "Réessayer"
+  "tryAgain": "Réessayer",
+  "listChangeNotSaved": "Une modification de liste n'a pas pu être enregistrée et a été annulée."
 }

@@ -61,6 +61,7 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
   // The user on screen and their store.
   AuthUser? _user;
   FirestoreListStore? _store;
+  StreamSubscription<Object>? _writeFailures;
   // The user Firebase last reported; shown once no sign-out is running.
   AuthUser? _latest;
   // A sign-out (with its cache clear) is running. Auth transitions run one
@@ -80,6 +81,7 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
   @override
   void dispose() {
     _subscription.cancel();
+    _writeFailures?.cancel();
     unawaited(_store?.close());
     super.dispose();
   }
@@ -104,8 +106,25 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
       }
     });
     if (!sameUser) {
+      _watchWriteFailures();
       unawaited(old?.close());
     }
+  }
+
+  // A list create, delete or Undo completes on the device at once; if the
+  // server rejects it later, Firestore undoes it and this says so (T-17 R3).
+  void _watchWriteFailures() {
+    _writeFailures?.cancel();
+    _writeFailures = _store?.writeFailures.listen((_) {
+      final BuildContext? context = _messenger.currentContext;
+      if (context != null && context.mounted) {
+        _messenger.currentState?.showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).listChangeNotSaved),
+          ),
+        );
+      }
+    });
   }
 
   // Takes the lists off the screen at once, closes the store, then signs
@@ -120,6 +139,7 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
       _user = null;
       _store = null;
     });
+    _watchWriteFailures();
     final bool cleared;
     try {
       await store?.close();

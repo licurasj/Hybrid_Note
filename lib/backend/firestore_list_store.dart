@@ -26,6 +26,11 @@ import '../lists/list_store.dart';
 //
 // Writes go out as batched writes of at most [batchLimit] documents, all
 // committed at once so that offline they all queue in the local cache.
+// createList, deleteList and restoreList complete once the local cache has
+// the change, not when the server acknowledges it, which offline would wait
+// until the device is back online (T-17 R3, D-5). If the server later
+// rejects the write, Firestore undoes it locally and [writeFailures] reports
+// it.
 //
 // Patches (Q-16 B with C as the offline fallback): online, patchList runs a
 // transaction over the list document as stored and every item the cache
@@ -113,6 +118,12 @@ class FirestoreListStore implements ListStore {
   ListCatalog? _catalog;
   final StreamController<ListCatalog> _changes =
       StreamController<ListCatalog>.broadcast();
+  final StreamController<Object> _writeFailures =
+      StreamController<Object>.broadcast();
+
+  // List writes the server rejected after they completed for the caller
+  // (createList, deleteList, restoreList); the app shows a snackbar.
+  Stream<Object> get writeFailures => _writeFailures.stream;
 
   static const ListCatalog _empty = ListCatalog(definitions: [], items: []);
 
@@ -440,6 +451,7 @@ class FirestoreListStore implements ListStore {
     }
     _itemSubscriptions.clear();
     await _changes.close();
+    await _writeFailures.close();
   }
 
   // Empty until the initial load is complete.
@@ -490,6 +502,30 @@ class FirestoreListStore implements ListStore {
       commits.add(batch.commit());
     }
     await Future.wait(commits);
+  }
+
+  // Commits [writes] and completes once the catalog shows them ([accepted]),
+  // or once the commit settles if that comes first. A failed commit is
+  // logged and reported on [writeFailures], also after this has completed.
+  Future<void> _writeAccepted(
+    String what,
+    List<void Function(WriteBatch batch)> writes,
+    bool Function(ListCatalog catalog) accepted,
+  ) async {
+    // Listening before the commit, so the local snapshot is not missed. It
+    // ends without a match when the store closes.
+    final Future<void> seen = _changes.stream
+        .firstWhere(accepted)
+        .then<void>((_) {}, onError: (Object _) {});
+    final Future<void> acknowledged = _write(writes).catchError((
+      Object error,
+    ) {
+      _log(what, error);
+      if (!_writeFailures.isClosed) {
+        _writeFailures.add(error);
+      }
+    });
+    await Future.any([seen, acknowledged]);
   }
 
   void Function(WriteBatch batch) _setDefinition(ListDefinition definition) {
@@ -632,11 +668,15 @@ class FirestoreListStore implements ListStore {
     ];
     if (errors.isEmpty) {
       _createdAts[definition.id] = DateTime.now().toUtc();
-      await _write([
-        _setDefinition(definition),
-        for (final ListItem item in items)
-          _setItem(item, definition.schemaRevision),
-      ]);
+      await _writeAccepted(
+        'create ${definition.id}',
+        [
+          _setDefinition(definition),
+          for (final ListItem item in items)
+            _setItem(item, definition.schemaRevision),
+        ],
+        (catalog) => catalog.definition(definition.id) != null,
+      );
     }
     return errors;
   }
@@ -800,25 +840,34 @@ class FirestoreListStore implements ListStore {
     // the malformed ones as well (T-14 R3). An item another device adds
     // meanwhile, before this device has seen it, stays behind unseen.
     final List<ListItem> items = _items[listId]?.values.toList() ?? const [];
-    await _write([
-      for (final String itemId in {
-        ...?_docIds[listId],
-        for (final ListItem item in items) item.id,
-      })
-        _deleteItem(listId, itemId),
-      (batch) => batch.delete(_lists.doc(listId)),
-    ]);
+    await _writeAccepted(
+      'delete $listId',
+      [
+        for (final String itemId in {
+          ...?_docIds[listId],
+          for (final ListItem item in items) item.id,
+        })
+          _deleteItem(listId, itemId),
+        (batch) => batch.delete(_lists.doc(listId)),
+      ],
+      (catalog) => catalog.definition(listId) == null,
+    );
     return DeletedList(definition: definition, items: items);
   }
 
   @override
   Future<void> restoreList(DeletedList deleted) async {
     await _ready.future;
-    await _write([
-      _setDefinition(deleted.definition),
-      for (final ListItem item in deleted.items)
-        _setItem(item, deleted.definition.schemaRevision),
-    ]);
+    final String listId = deleted.definition.id;
+    await _writeAccepted(
+      'restore $listId',
+      [
+        _setDefinition(deleted.definition),
+        for (final ListItem item in deleted.items)
+          _setItem(item, deleted.definition.schemaRevision),
+      ],
+      (catalog) => catalog.definition(listId) != null,
+    );
   }
 
   static Object? _encode(Object? value, {bool inList = false}) {

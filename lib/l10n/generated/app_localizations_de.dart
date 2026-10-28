@@ -833,4 +833,8 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get tryAgain => 'Erneut versuchen';
+
+  @override
+  String get listChangeNotSaved =>
+      'Eine Listenänderung konnte nicht gespeichert werden und wurde rückgängig gemacht.';
 }

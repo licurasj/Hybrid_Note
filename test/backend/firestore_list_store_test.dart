@@ -14,6 +14,7 @@ import 'package:hybrid_note/lists/list_rules.dart';
 import 'package:hybrid_note/lists/list_store.dart';
 
 import '../lists/list_store_contract_test.dart' show listStoreContract;
+import '../support/firestore_store.dart' show DelayedAckFirestore;
 
 const String _uid = 'user-1';
 final DateTime _t0 = DateTime.utc(2026, 3, 1);
@@ -319,6 +320,45 @@ void main() {
       expect(catalog.definitions.last.id, 'list-0');
     });
 
+    test('create, delete and Undo complete before the server answers', () async {
+      final DelayedAckFirestore firestore = DelayedAckFirestore();
+      final FirestoreListStore store = await _loaded(firestore);
+      firestore.holdAcks = true;
+      const Duration local = Duration(seconds: 5);
+
+      // Offline the server answers only once back online; the caller goes on
+      // as soon as the device has the change (T-17 R3, D-5).
+      expect(await store.createList(_simple('list-a')).timeout(local), isEmpty);
+      expect(store.current.definition('list-a'), isNotNull);
+
+      final DeletedList? deleted = await store
+          .deleteList('list-a')
+          .timeout(local);
+      expect(deleted, isNotNull);
+      expect(store.current.definition('list-a'), isNull);
+
+      await store.restoreList(deleted!).timeout(local);
+      expect(store.current.definition('list-a'), isNotNull);
+      expect(firestore.acks, hasLength(3));
+      expect(firestore.acks.where((ack) => ack.isCompleted), isEmpty);
+    });
+
+    test('a write the server rejects later is reported', () async {
+      final DelayedAckFirestore firestore = DelayedAckFirestore();
+      final FirestoreListStore store = await _loaded(firestore);
+      final List<Object> failures = [];
+      store.writeFailures.listen(failures.add);
+      firestore.holdAcks = true;
+
+      expect(await store.createList(_simple('list-a')), isEmpty);
+      expect(failures, isEmpty);
+      firestore.acks.single.completeError(
+        FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied'),
+      );
+      await pumpEventQueue();
+      expect(failures.single, isA<FirebaseException>());
+    });
+
     test('lists created at the same time are ordered by id', () async {
       final FakeFirebaseFirestore firestore = FakeFirebaseFirestore();
       for (final String id in ['list-b', 'list-c', 'list-a']) {
@@ -503,14 +543,21 @@ void main() {
               c.itemsOf('list-big').every((item) => item['title'] == 'Edited'),
         );
 
+        final Future<void> allDeleted = firestore
+            .collection('users/$_uid/lists/list-big/items')
+            .snapshots()
+            .firstWhere((snapshot) => snapshot.size == 0);
         final DeletedList? deleted = await store.deleteList('list-big');
         expect(deleted!.items, hasLength(count));
         await _until(store, (c) => c.definition('list-big') == null);
-        expect(
-          (await firestore.collection('users/$_uid/lists/list-big/items').get())
-              .size,
-          0,
-        );
+        // deleteList completes once the list is gone locally (T-17 R3). The
+        // fake applies a batch one document at a time, so the other batches'
+        // item deletes may still be running; Firestore applies each batch
+        // whole and in order, so there Undo always comes after them. (The
+        // fake's get() already reports no items once the list document is
+        // gone; a listener from before the delete reports them as they
+        // happen.)
+        await allDeleted.timeout(const Duration(seconds: 10));
 
         await store.restoreList(deleted);
         await _until(store, (c) => c.itemsOf('list-big').length == count);

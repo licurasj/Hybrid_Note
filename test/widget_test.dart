@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +9,7 @@ import 'package:hybrid_note/app/app_settings.dart';
 import 'package:hybrid_note/backend/auth_service.dart';
 import 'package:hybrid_note/backend/firestore_list_store.dart';
 import 'package:hybrid_note/lists/builtin_templates.dart';
+import 'package:hybrid_note/lists/generic_list_screen.dart';
 import 'package:hybrid_note/lists/list_definition.dart';
 
 import 'support/fake_auth.dart';
@@ -267,6 +269,89 @@ void main() {
     await settle(tester);
     expect(store.current.definitions.last.name, 'Plants');
     expect(store.current.definitions.last.templateId, isNull);
+  });
+
+  testWidgets('offline, a new list opens and a deleted one offers Undo at once', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    SharedPreferences.setMockInitialValues(const {});
+    final DelayedAckFirestore firestore = DelayedAckFirestore();
+    final FirestoreListStore store = await widgetTestStore(
+      tester,
+      firestore: firestore,
+    );
+    await tester.pumpWidget(
+      await testApp(
+        auth: FakeAuthService(user: testUser),
+        openStore: (_) => store,
+      ),
+    );
+    await settle(tester);
+    // From here the server never answers (T-17 R3).
+    firestore.holdAcks = true;
+
+    await tester.tap(_hub);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('launcher-add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('template-blank')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('list-name')), 'Plants');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('save-list')));
+    await settle(tester);
+    expect(find.byType(GenericListScreen), findsOneWidget);
+    final String created = store.current.definitions.last.id;
+    expect(store.current.definitions.last.name, 'Plants');
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(_hub);
+    await tester.pump();
+    await tester.longPress(find.byKey(ValueKey('launcher-note-$created')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('delete-list')));
+    await settle(tester);
+    expect(store.current.definition(created), isNull);
+    expect(find.text('List deleted'), findsOneWidget);
+
+    await tester.tap(find.text('Undo'));
+    await settle(tester);
+    expect(store.current.definition(created)!.name, 'Plants');
+    expect(firestore.acks, hasLength(3));
+    expect(firestore.acks.where((ack) => ack.isCompleted), isEmpty);
+  });
+
+  testWidgets('a list change the server rejects later shows a message', (
+    WidgetTester tester,
+  ) async {
+    final DelayedAckFirestore firestore = DelayedAckFirestore();
+    SharedPreferences.setMockInitialValues(const {});
+    final FirestoreListStore store = await widgetTestStore(
+      tester,
+      firestore: firestore,
+    );
+    await tester.pumpWidget(
+      await testApp(
+        auth: FakeAuthService(user: testUser),
+        openStore: (_) => store,
+      ),
+    );
+    await settle(tester);
+    firestore.holdAcks = true;
+
+    await tester.runAsync(
+      () => store.deleteList(BuiltinTemplates.groceryId),
+    );
+    firestore.acks.single.completeError(
+      FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied'),
+    );
+    await settle(tester);
+    expect(find.text('A list change could not be saved and was undone.'),
+        findsOneWidget);
   });
 
   testWidgets('the hub can be moved and its position is saved', (

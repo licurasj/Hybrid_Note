@@ -821,4 +821,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get tryAgain => '重试';
+
+  @override
+  String get listChangeNotSaved => '列表更改无法保存，已撤销。';
 }

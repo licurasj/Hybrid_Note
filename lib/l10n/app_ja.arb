@@ -300,5 +300,6 @@
   "signInOffline": "接続がありません。サインインするにはインターネットに接続してください。",
   "signOutFailed": "サインアウトに失敗しました。もう一度お試しください。",
   "signOutCleanupFailed": "サインアウトしましたが、この端末に保存されたリストを削除できませんでした。",
-  "tryAgain": "再試行"
+  "tryAgain": "再試行",
+  "listChangeNotSaved": "リストの変更を保存できなかったため、元に戻しました。"
 }

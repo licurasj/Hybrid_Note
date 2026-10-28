@@ -300,5 +300,6 @@
   "signInOffline": "无网络连接。请连接互联网后登录。",
   "signOutFailed": "退出登录失败，请重试。",
   "signOutCleanupFailed": "已退出登录，但无法删除保存在此设备上的列表。",
-  "tryAgain": "重试"
+  "tryAgain": "重试",
+  "listChangeNotSaved": "列表更改无法保存，已撤销。"
 }

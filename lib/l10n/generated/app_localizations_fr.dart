@@ -831,4 +831,8 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get tryAgain => 'Réessayer';
+
+  @override
+  String get listChangeNotSaved =>
+      'Une modification de liste n\'a pas pu être enregistrée et a été annulée.';
 }

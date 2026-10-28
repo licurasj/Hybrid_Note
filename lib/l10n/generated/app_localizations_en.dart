@@ -829,4 +829,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tryAgain => 'Try again';
+
+  @override
+  String get listChangeNotSaved =>
+      'A list change could not be saved and was undone.';
 }
