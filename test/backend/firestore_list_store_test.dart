@@ -1031,6 +1031,49 @@ void main() {
       },
     );
 
+    // T-14 R5: the outer shape is fine, so ListItem.fromJson takes it, but
+    // the hidden values are not a map.
+    test(
+      'a stale item with malformed hidden values is skipped; the rest is '
+      'repaired',
+      () async {
+        final FakeFirebaseFirestore firestore = await _seeded();
+        await firestore
+            .doc('users/$_uid/lists/list-a')
+            .set(
+              ListPatch.apply(
+                _simple('list-a'),
+                const [],
+                _toCounter,
+                _t0,
+              ).definition.toJson(),
+            );
+        final String items = 'users/$_uid/lists/list-a/items';
+        await firestore.doc('$items/a-bad').set({
+          ..._kind('a-bad', 'many').toJson(),
+          'values': {'title': 'x', 'kind': 'many', ListPatch.legacyKey: 'bad'},
+          '_rev': 1,
+        });
+        await firestore.doc('$items/b-good').set({
+          ..._kind('b-good', '3').toJson(),
+          '_rev': 1,
+        });
+
+        final List<String> skipped = [];
+        final FirestoreListStore store = await _loaded(
+          firestore,
+          onSkipped: (path, error) => skipped.add(path),
+        );
+        await _until(
+          store,
+          (c) => c.itemsOf('list-a').any((i) => i['kind'] == 3),
+        );
+        expect(skipped, ['$items/a-bad']);
+        expect(store.current.itemsOf('list-a').map((i) => i.id), ['b-good']);
+        expect((await firestore.doc('$items/b-good').get()).data()!['_rev'], 2);
+      },
+    );
+
     test('an item that already fits is not rewritten by the repair', () async {
       final FakeFirebaseFirestore firestore = await _seeded();
       await firestore

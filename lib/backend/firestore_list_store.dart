@@ -184,7 +184,14 @@ class FirestoreListStore implements ListStore {
   }
 
   static ListItem _itemFrom(Map<String, dynamic> data) {
-    return ListItem.fromJson(_decode(data)..remove(_revKey));
+    final ListItem item = ListItem.fromJson(_decode(data)..remove(_revKey));
+    // Hidden values are a map (D-10); anything else could not be fitted or
+    // patched, so the item is skipped like any malformed one (T-14 R5).
+    final Object? legacy = item.values[ListPatch.legacyKey];
+    if (legacy != null && legacy is! Map) {
+      throw const FormatException('`_legacy` is not a map');
+    }
+    return item;
   }
 
   // Loaded once the lists and every list's items have arrived.
@@ -225,9 +232,14 @@ class FirestoreListStore implements ListStore {
           continue;
         }
         _checked[path] = check;
-        final ListItem? fitted = _fit(definition, item);
-        if (fitted != null) {
-          writes.add(_setItem(fitted, revision));
+        try {
+          final ListItem? fitted = _fit(definition, item);
+          if (fitted != null) {
+            writes.add(_setItem(fitted, revision));
+          }
+        } on Object catch (error) {
+          // Reported, and the other items are still repaired (T-14 R5).
+          _skip(_itemsOf(entry.key).doc(item.id).path, error);
         }
       }
     }
