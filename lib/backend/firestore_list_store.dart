@@ -3,7 +3,6 @@ import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../lists/builtin_templates.dart';
 import '../lists/list_catalog.dart';
 import '../lists/list_definition.dart';
 import '../lists/list_error.dart';
@@ -14,8 +13,11 @@ import '../lists/list_store.dart';
 
 // ListStore over Firestore (Q-5 A): users/{uid}/lists/{listId} holds a
 // definition and users/{uid}/lists/{listId}/items/{itemId} an item, each as
-// its toJson(). The built-ins are ordinary definition documents with their
-// fixed ids; writing them for a new user is the Block B switch-over's job.
+// its toJson(). There are no built-in lists (Q-22 D): the starter copies of
+// the templates are ordinary lists, written once per account by
+// starter_lists.dart. Lists come in the order they were created: each
+// definition document carries the store's `_createdAt` (an ISO date, not
+// part of the definition's JSON), then the id breaks ties.
 //
 // Reads come from one listener on the lists and one per list on its items.
 // watch() emits nothing until the lists and every list's items have loaded
@@ -72,6 +74,9 @@ class FirestoreListStore implements ListStore {
   // the item was written for. Not part of the item's JSON.
   static const String _revKey = '_rev';
 
+  // The store-owned key on definition documents: when the list was created.
+  static const String createdAtKey = '_createdAt';
+
   // Firestore rejects an array directly inside an array, which a hidden
   // tags or checklist value in `_legacy` is (D-10). Such an inner list is
   // stored as {"__array": [...]}.
@@ -89,6 +94,9 @@ class FirestoreListStore implements ListStore {
   late final StreamSubscription<Object?> _listsSubscription;
   // Each item's `_rev`, by list and item id.
   final Map<String, Map<String, int>> _revs = {};
+  // Each list's `_createdAt`, kept after a delete so an undone delete puts
+  // the list back in its place.
+  final Map<String, DateTime> _createdAts = {};
   // The ids of every item document under each list, including the ones
   // skipped as malformed, so a list delete removes them all (T-14 R3).
   final Map<String, Set<String>> _docIds = {};
@@ -130,13 +138,15 @@ class FirestoreListStore implements ListStore {
     for (final QueryDocumentSnapshot<Map<String, dynamic>> doc
         in snapshot.docs) {
       try {
-        final ListDefinition definition = ListDefinition.fromJson(
-          _decode(doc.data()),
-        );
+        final ListDefinition definition = _definitionFrom(doc.data());
         if (definition.id != doc.id) {
           throw FormatException('id "${definition.id}" is not the document id');
         }
         _definitions[doc.id] = definition;
+        final DateTime? createdAt = _createdAtOf(doc.data());
+        if (createdAt != null) {
+          _createdAts[doc.id] = createdAt;
+        }
         _reported.remove(doc.reference.path);
       } on Object catch (error) {
         _skip(doc.reference.path, error);
@@ -192,6 +202,15 @@ class FirestoreListStore implements ListStore {
     _revs[listId] = revs;
     _docIds[listId] = {for (final doc in snapshot.docs) doc.id};
     _update();
+  }
+
+  static ListDefinition _definitionFrom(Map<String, dynamic> data) {
+    return ListDefinition.fromJson(_decode(data)..remove(createdAtKey));
+  }
+
+  static DateTime? _createdAtOf(Map<String, dynamic> data) {
+    final Object? raw = data[createdAtKey];
+    return raw is String ? DateTime.tryParse(raw) : null;
   }
 
   static ListItem _itemFrom(Map<String, dynamic> data) {
@@ -292,9 +311,7 @@ class FirestoreListStore implements ListStore {
         if (listData == null) {
           return;
         }
-        final ListDefinition definition = ListDefinition.fromJson(
-          _decode(listData),
-        );
+        final ListDefinition definition = _definitionFrom(listData);
         final int revision = definition.schemaRevision;
         final List<ListItem> fitted = [];
         for (final String itemId in chunk) {
@@ -320,7 +337,7 @@ class FirestoreListStore implements ListStore {
         for (final ListItem item in fitted) {
           transaction.set(
             _itemsOf(listId).doc(item.id),
-            _itemData(
+            itemData(
               touchedAt == null ? item : _touched(item, touchedAt),
               revision,
             ),
@@ -383,22 +400,19 @@ class FirestoreListStore implements ListStore {
     );
   }
 
-  // The built-ins first, in their usual order, then the user's lists.
+  // The lists by creation time, then id; a list without `_createdAt` comes
+  // first.
   ListCatalog _build() {
-    const List<String> builtinOrder = [
-      BuiltinTemplates.tasksId,
-      BuiltinTemplates.groceryId,
-      BuiltinTemplates.journalId,
-      BuiltinTemplates.watchReadId,
-    ];
-    final List<String> userIds =
-        _definitions.keys
-            .where((id) => !BuiltinTemplates.isBuiltin(id))
-            .toList()
-          ..sort();
+    final DateTime unknown = DateTime.utc(0);
+    final List<String> ids = _definitions.keys.toList()
+      ..sort((a, b) {
+        final int byTime = (_createdAts[a] ?? unknown).compareTo(
+          _createdAts[b] ?? unknown,
+        );
+        return byTime != 0 ? byTime : a.compareTo(b);
+      });
     final List<ListDefinition> definitions = [
-      for (final String id in [...builtinOrder, ...userIds])
-        if (_definitions[id] != null) _definitions[id]!,
+      for (final String id in ids) _definitions[id]!,
     ];
     return ListCatalog(
       definitions: definitions,
@@ -472,13 +486,25 @@ class FirestoreListStore implements ListStore {
   void Function(WriteBatch batch) _setDefinition(ListDefinition definition) {
     return (batch) => batch.set(
       _lists.doc(definition.id),
-      _encode(definition.toJson()) as Map<String, dynamic>,
+      definitionData(definition, createdAt: _createdAts[definition.id]),
     );
+  }
+
+  // A definition document: the definition's JSON plus `_createdAt` when it
+  // is known (a document written without one keeps having none).
+  static Map<String, dynamic> definitionData(
+    ListDefinition definition, {
+    DateTime? createdAt,
+  }) {
+    return {
+      ...(_encode(definition.toJson()) as Map<String, dynamic>),
+      if (createdAt != null) createdAtKey: createdAt.toUtc().toIso8601String(),
+    };
   }
 
   // An item document: the item's JSON plus `_rev`, the revision of the list
   // definition it was written for.
-  Map<String, dynamic> _itemData(ListItem item, int revision) {
+  static Map<String, dynamic> itemData(ListItem item, int revision) {
     return {
       ...(_encode(item.toJson()) as Map<String, dynamic>),
       _revKey: revision,
@@ -488,7 +514,7 @@ class FirestoreListStore implements ListStore {
   void Function(WriteBatch batch) _setItem(ListItem item, int revision) {
     return (batch) => batch.set(
       _itemsOf(item.listId).doc(item.id),
-      _itemData(item, revision),
+      itemData(item, revision),
     );
   }
 
@@ -576,8 +602,7 @@ class FirestoreListStore implements ListStore {
     List<ListItem> items = const [],
   }) async {
     await _ready.future;
-    if (_definitions.containsKey(definition.id) ||
-        BuiltinTemplates.isBuiltin(definition.id)) {
+    if (_definitions.containsKey(definition.id)) {
       return [ListError(ListErrorCode.listExists, {'list': definition.id})];
     }
     // Item ids are unique across every list, since item deletes go by id.
@@ -597,6 +622,7 @@ class FirestoreListStore implements ListStore {
             error.forItem(item.id),
     ];
     if (errors.isEmpty) {
+      _createdAts[definition.id] = DateTime.now().toUtc();
       await _write([
         _setDefinition(definition),
         for (final ListItem item in items)
@@ -670,7 +696,7 @@ class FirestoreListStore implements ListStore {
       if (data == null) {
         return null;
       }
-      final ListDefinition definition = ListDefinition.fromJson(_decode(data));
+      final ListDefinition definition = _definitionFrom(data);
       final List<ListItem> items = [];
       for (final String itemId in itemIds) {
         final Map<String, dynamic>? itemData = (await transaction.get(
@@ -702,13 +728,13 @@ class FirestoreListStore implements ListStore {
       ];
       transaction.set(
         _lists.doc(listId),
-        _encode(result.definition.toJson()) as Map<String, dynamic>,
+        definitionData(result.definition, createdAt: _createdAtOf(data)),
       );
       if (changed.length < batchLimit) {
         for (final ListItem item in changed) {
           transaction.set(
             _itemsOf(listId).doc(item.id),
-            _itemData(item, revision),
+            itemData(item, revision),
           );
         }
       } else {

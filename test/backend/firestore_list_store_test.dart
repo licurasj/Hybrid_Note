@@ -131,11 +131,13 @@ class _ScriptedBatch implements WriteBatch {
   }
 }
 
+// A stored document without the store's `_createdAt` (tested on its own).
 Future<Map<String, dynamic>> _doc(
   FakeFirebaseFirestore firestore,
   String path,
 ) async {
-  return (await firestore.doc('users/$_uid/lists/$path').get()).data()!;
+  return (await firestore.doc('users/$_uid/lists/$path').get()).data()!
+    ..remove(FirestoreListStore.createdAtKey);
 }
 
 ListItem _kind(String id, Object kind) {
@@ -285,6 +287,78 @@ void main() {
   }, dispose: (store) => closers.remove(store)!());
 
   group('FirestoreListStore', () {
+    test('lists come in creation order, then by id (Q-22 D)', () async {
+      final FakeFirebaseFirestore firestore = FakeFirebaseFirestore();
+      Future<void> put(String id, String? createdAt) {
+        return firestore.doc('users/$_uid/lists/$id').set({
+          ..._simple(id).toJson(),
+          '_createdAt': ?createdAt,
+        });
+      }
+
+      await put('list-c', '2026-03-01T00:00:00.001Z');
+      await put('list-a', '2026-03-01T00:00:00.002Z');
+      await put('list-b', '2026-03-01T00:00:00.001Z');
+      await put('list-old', null);
+      final FirestoreListStore store = await _loaded(firestore);
+
+      expect(store.current.definitions.map((d) => d.id), [
+        'list-old',
+        'list-b',
+        'list-c',
+        'list-a',
+      ]);
+      // `_createdAt` belongs to the store, not to the definition.
+      expect(store.current.definition('list-a')!.extra, isEmpty);
+
+      expect(await store.createList(_simple('list-0')), isEmpty);
+      final ListCatalog catalog = await _until(
+        store,
+        (c) => c.definition('list-0') != null,
+      );
+      expect(catalog.definitions.last.id, 'list-0');
+    });
+
+    test('a patch and an undone delete keep the list in its place', () async {
+      final FakeFirebaseFirestore firestore = FakeFirebaseFirestore();
+      final FirestoreListStore store = await _loaded(firestore);
+      expect(await store.createList(_simple('list-b')), isEmpty);
+      expect(await store.createList(_simple('list-a')), isEmpty);
+      await _until(store, (c) => c.definitions.length == 2);
+      final Object? createdAt = (await firestore
+              .doc('users/$_uid/lists/list-b')
+              .get())
+          .data()!['_createdAt'];
+      expect(createdAt, isA<String>());
+
+      final ListPatchResult? result = await store.patchList('list-b', const [
+        ListPatchOp(PatchOpKind.setListInfo, {'name': 'Renamed'}),
+      ]);
+      expect(result!.isValid, isTrue);
+      expect(
+        (await firestore.doc('users/$_uid/lists/list-b').get())
+            .data()!['_createdAt'],
+        createdAt,
+      );
+
+      final DeletedList deleted = (await store.deleteList('list-b'))!;
+      await _until(store, (c) => c.definitions.length == 1);
+      await store.restoreList(deleted);
+      final ListCatalog catalog = await _until(
+        store,
+        (c) => c.definitions.length == 2,
+      );
+      expect(catalog.definitions.map((d) => d.id), ['list-b', 'list-a']);
+    });
+
+    test('a list may use a template id: there are no built-ins', () async {
+      final FirestoreListStore store = await _loaded(FakeFirebaseFirestore());
+
+      expect(await store.createList(BuiltinTemplates.tasks()), isEmpty);
+      await _until(store, (c) => c.definition(BuiltinTemplates.tasksId) != null);
+      expect(await store.deleteList(BuiltinTemplates.tasksId), isNotNull);
+    });
+
     test('stores the Q-5 layout: one document per list and per item', () async {
       final FakeFirebaseFirestore firestore = await _seeded();
       final FirestoreListStore store = await _loaded(firestore);
@@ -292,7 +366,11 @@ void main() {
       expect(await store.createList(list, items: [_row('list-a', 1)]), isEmpty);
 
       final listDoc = await firestore.doc('users/$_uid/lists/list-a').get();
-      expect(listDoc.data(), list.toJson());
+      // Plus `_createdAt`, for the list order.
+      expect(listDoc.data(), {
+        ...list.toJson(),
+        '_createdAt': isA<String>(),
+      });
       final itemDoc = await firestore
           .doc('users/$_uid/lists/list-a/items/list-a-item-1')
           .get();
