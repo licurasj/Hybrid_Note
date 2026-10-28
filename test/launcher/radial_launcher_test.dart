@@ -487,6 +487,27 @@ void main() {
       expect(log.events, ['open n3', 'edit n1']);
     });
 
+    testWidgets('"+" is visible in tap mode and starts a new list', (tester) async {
+      final _Log log = await _pump(tester);
+
+      await tester.tap(find.byKey(const ValueKey('launcher-hub')));
+      await tester.pump();
+
+      final Finder add = find.byKey(const ValueKey('launcher-add'));
+      final Finder icon = find.descendant(of: add, matching: find.byIcon(Icons.add));
+      expect(icon, findsOneWidget);
+      final Opacity opacity = tester.widget<Opacity>(
+        find.ancestor(of: icon, matching: find.byType(Opacity)).first,
+      );
+      expect(opacity.opacity, 1);
+      expect(tester.getSize(find.ancestor(of: icon, matching: find.byType(Container)).first).width,
+          greaterThan(0));
+
+      await tester.tap(add);
+      await tester.pump();
+      expect(log.events, ['new']);
+    });
+
     testWidgets('tap outside closes; "+" is inactive without onNew', (tester) async {
       final _Log log = await _pump(tester, withNew: false);
 

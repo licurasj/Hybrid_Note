@@ -653,7 +653,7 @@ class RadialLauncherState extends State<RadialLauncher>
 
   // A prompt label sliding out from `from` to `to` while fading in; dark until
   // approached, lighter and slightly larger with `progress` (interaction law).
-  Widget _promptPill({
+  Positioned _promptPill({
     required Key key,
     required Offset from,
     required Offset to,
@@ -718,7 +718,7 @@ class RadialLauncherState extends State<RadialLauncher>
 
   Widget _addWidget(LauncherGeometry geometry) {
     final bool enabled = widget.onNew != null;
-    final Widget pill = _promptPill(
+    final Positioned pill = _promptPill(
       key: const ValueKey('launcher-add-prompt'),
       from: geometry.hubCenter,
       to: geometry.addCenter,
@@ -732,7 +732,7 @@ class RadialLauncherState extends State<RadialLauncher>
     if (_mode != _Mode.tap) {
       return pill;
     }
-    // In tap mode the "+" is a plain button.
+    // In tap mode the "+" is a plain button around the same pill.
     return Positioned(
       left: geometry.addCenter.dx - 24,
       top: geometry.addCenter.dy - 24,
@@ -750,7 +750,11 @@ class RadialLauncherState extends State<RadialLauncher>
                   widget.onNew!();
                 }
               : null,
-          child: const SizedBox(width: 48, height: 48),
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Center(child: pill.child),
+          ),
         ),
       ),
     );
