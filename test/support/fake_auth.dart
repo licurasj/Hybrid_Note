@@ -15,7 +15,8 @@ const AuthUser testUser = AuthUser(uid: testUid, email: 'owner@example.com');
 
 // AuthService without Firebase: [signInWithGoogle] signs in as [nextUser]
 // (or throws [signInError]); [calls] records what was called. Each cache
-// clear takes the next of [cleanupResults] (true once it is empty).
+// clear takes the next of [cleanupResults] (true once it is empty) and,
+// while [cleanupGate] is set, waits for it.
 class FakeAuthService implements AuthService {
   FakeAuthService({AuthUser? user, this.nextUser = testUser}) : _user = user;
 
@@ -23,6 +24,7 @@ class FakeAuthService implements AuthService {
   AuthUser? nextUser;
   AuthException? signInError;
   final List<bool> cleanupResults = [];
+  Completer<void>? cleanupGate;
   final List<String> calls = [];
   final StreamController<AuthUser?> _changes =
       StreamController<AuthUser?>.broadcast();
@@ -67,6 +69,7 @@ class FakeAuthService implements AuthService {
   @override
   Future<bool> clearLocalData() async {
     calls.add('clearCache');
+    await cleanupGate?.future;
     return cleanupResults.isEmpty ? true : cleanupResults.removeAt(0);
   }
 }

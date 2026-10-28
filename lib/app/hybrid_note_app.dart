@@ -43,6 +43,8 @@ class HybridNoteApp extends StatefulWidget {
   // Runs once sign-out has finished and the cache is cleared; on web it
   // reloads the page, since the cleared Firestore instance cannot be used
   // again (FirestoreSetup). It does not run while the cache is still there.
+  // When it is set, the gate opens no store after a sign-out: the restarted
+  // app does.
   final VoidCallback? afterSignOut;
 
   @override
@@ -56,8 +58,15 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
   // False until Firebase has said whether a user is signed in, so a
   // restored session does not flash the sign-in screen.
   bool _known = false;
+  // The user on screen and their store.
   AuthUser? _user;
   FirestoreListStore? _store;
+  // The user Firebase last reported; shown once no sign-out is running.
+  AuthUser? _latest;
+  // A sign-out (with its cache clear) is running. Auth transitions run one
+  // at a time: meanwhile sign-in is disabled and a new user waits, so no
+  // store opens on a cache that is about to be deleted (T-17 R2).
+  bool _signingOut = false;
   // Signed out, but the previous account's cache could not be cleared: the
   // sign-in screen says so and offers to try again (T-17 R1, Q-25 A).
   bool _cleanupFailed = false;
@@ -76,6 +85,15 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
   }
 
   void _onUser(AuthUser? user) {
+    _latest = user;
+    if (_signingOut || _cleanupFailed) {
+      setState(() => _known = true);
+      return;
+    }
+    _show(user);
+  }
+
+  void _show(AuthUser? user) {
     final FirestoreListStore? old = _store;
     final bool sameUser = user?.uid == _user?.uid;
     setState(() {
@@ -93,8 +111,12 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
   // Takes the lists off the screen at once, closes the store, then signs
   // out (which clears the cache, Q-25 A).
   Future<void> _signOut() async {
+    if (_signingOut) {
+      return;
+    }
     final FirestoreListStore? store = _store;
     setState(() {
+      _signingOut = true;
       _user = null;
       _store = null;
     });
@@ -112,7 +134,8 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
       }
       // Still signed in: back to that user's lists.
       if (mounted) {
-        _onUser(widget.auth.currentUser);
+        _signingOut = false;
+        _show(widget.auth.currentUser);
       }
       return;
     }
@@ -120,18 +143,29 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
   }
 
   Future<void> _retryCleanup() async {
+    setState(() => _signingOut = true);
     _afterCleanup(await widget.auth.clearLocalData());
   }
 
-  // Signed out either way; only a cleared cache counts as done.
+  // Signed out either way; only a cleared cache ends the sign-out. Then
+  // [HybridNoteApp.afterSignOut] restarts the app (web), or the user
+  // Firebase reports by now is shown (null, or one who signed in since).
   void _afterCleanup(bool cleared) {
     if (!mounted) {
       return;
     }
-    setState(() => _cleanupFailed = !cleared);
-    if (cleared) {
-      widget.afterSignOut?.call();
+    setState(() {
+      _signingOut = false;
+      _cleanupFailed = !cleared;
+    });
+    if (!cleared) {
+      return;
     }
+    if (widget.afterSignOut != null) {
+      widget.afterSignOut!();
+      return;
+    }
+    _show(_latest);
   }
 
   @override
@@ -144,6 +178,7 @@ class _HybridNoteAppState extends State<HybridNoteApp> {
     } else if (user == null || store == null) {
       home = SignInScreen(
         auth: widget.auth,
+        waiting: _signingOut,
         onRetryCleanup: _cleanupFailed ? _retryCleanup : null,
       );
     } else {

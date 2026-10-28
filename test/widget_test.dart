@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -111,6 +113,59 @@ void main() {
     expect(find.byKey(const ValueKey('cleanup-failed')), findsNothing);
     expect(signInEnabled(), isTrue);
     expect(reloads, 1);
+  });
+
+  testWidgets('a new user waits until the sign-out and its cleanup end', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    SharedPreferences.setMockInitialValues(const {});
+    final FakeAuthService auth = FakeAuthService(user: testUser)
+      ..cleanupGate = Completer<void>();
+    final List<FirestoreListStore> stores = [
+      await widgetTestStore(tester),
+      await widgetTestStore(tester),
+    ];
+    const AuthUser other = AuthUser(uid: 'user-2', email: 'other@example.com');
+    await tester.pumpWidget(
+      await testApp(
+        auth: auth,
+        openStore: (user) {
+          auth.calls.add('open ${user.uid}');
+          return stores.removeAt(0);
+        },
+      ),
+    );
+    await settle(tester);
+    final Finder signIn = find.byKey(const ValueKey('sign-in'));
+    bool signInEnabled() =>
+        tester.widget<ButtonStyleButton>(signIn).onPressed != null;
+
+    await tester.tap(find.byKey(const ValueKey('sign-out')));
+    await settle(tester);
+    // The cache is still being cleared: sign-in waits (T-17 R2).
+    expect(auth.calls, ['open $testUid', 'signOut', 'clearCache']);
+    expect(signInEnabled(), isFalse);
+
+    // Another user signs in meanwhile (another tab, say): no store opens on
+    // the cache that is about to go.
+    auth.emit(other);
+    await settle(tester);
+    expect(auth.calls, ['open $testUid', 'signOut', 'clearCache']);
+    expect(signIn, findsOneWidget);
+
+    auth.cleanupGate!.complete();
+    await settle(tester);
+    expect(auth.calls, [
+      'open $testUid',
+      'signOut',
+      'clearCache',
+      'open user-2',
+    ]);
+    expect(find.text('other@example.com'), findsOneWidget);
+    expect(_hub, findsOneWidget);
   });
 
   testWidgets('a sign-in failure shows a message and stays signed out', (
