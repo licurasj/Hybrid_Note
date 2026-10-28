@@ -102,7 +102,18 @@ class CustomListsStorage {
     }
   }
 
-  Future<void> save(CustomListsData data) async {
+  // Saves run one at a time, in call order, for the same reason as in
+  // AppStorage: one shared temporary file, and callers emit before awaiting.
+  Future<void> _saveQueue = Future<void>.value();
+
+  Future<void> save(CustomListsData data) {
+    final Future<void> save = _saveQueue.then((_) => _write(data));
+    // A failed save must not block the ones after it.
+    _saveQueue = save.catchError((Object _) {});
+    return save;
+  }
+
+  Future<void> _write(CustomListsData data) async {
     final File file = await _file();
     final File temp = File('${file.path}.tmp');
     await temp.writeAsString(jsonEncode(data.toJson()), flush: true);

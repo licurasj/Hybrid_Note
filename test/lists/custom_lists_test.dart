@@ -130,4 +130,30 @@ void main() {
       hasLength(1),
     );
   });
+
+  test('overlapping file saves finish in call order; a failure does not block later saves', () async {
+    final Directory directory = await Directory.systemTemp.createTemp('hybrid_note_lists_');
+    addTearDown(() => directory.delete(recursive: true));
+    bool fail = true;
+    final CustomListsStorage files = CustomListsStorage(
+      getDirectory: () async {
+        if (fail) {
+          fail = false;
+          throw const FileSystemException('no folder');
+        }
+        return directory;
+      },
+    );
+
+    final Future<void> failed = files.save(const CustomListsData());
+    final List<Future<void>> saves = [
+      for (int i = 0; i < 20; i++)
+        files.save(CustomListsData(definitions: [_plants()], items: [_plant('fern', '$i')])),
+    ];
+    await expectLater(failed, throwsA(isA<FileSystemException>()));
+    await Future.wait(saves);
+
+    expect((await files.load()).items.single.toJson(), _plant('fern', '19').toJson());
+    expect(File('${directory.path}/hybrid_note_custom_lists.json.tmp').existsSync(), isFalse);
+  });
 }

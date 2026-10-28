@@ -17,7 +17,7 @@ class AppStorage {
   final Future<Directory> Function() _getDirectory;
 
   AppStorage({Future<Directory> Function()? getDirectory})
-      : _getDirectory = getDirectory ?? getApplicationDocumentsDirectory;
+    : _getDirectory = getDirectory ?? getApplicationDocumentsDirectory;
 
   Future<File> _getDataFile() async {
     final Directory directory = await _getDirectory();
@@ -90,7 +90,18 @@ class AppStorage {
     return file.rename('${file.path}.unreadable-$timestamp');
   }
 
-  Future<void> saveAppData(AppData data) async {
+  // Saves run one at a time, in call order: they share one temporary file and
+  // callers do not always wait for the previous save to finish.
+  Future<void> _saveQueue = Future<void>.value();
+
+  Future<void> saveAppData(AppData data) {
+    final Future<void> save = _saveQueue.then((_) => _writeAppData(data));
+    // A failed save must not block the ones after it.
+    _saveQueue = save.catchError((Object _) {});
+    return save;
+  }
+
+  Future<void> _writeAppData(AppData data) async {
     final File file = await _getDataFile();
     const JsonEncoder encoder = JsonEncoder.withIndent('  ');
 
@@ -121,8 +132,9 @@ class AppStorage {
 
   Future<void> saveHubPosition(Offset position) async {
     final Directory directory = await _getDirectory();
-    await File('${directory.path}/$_hubFileName')
-        .writeAsString('${position.dx},${position.dy}');
+    await File(
+      '${directory.path}/$_hubFileName',
+    ).writeAsString('${position.dx},${position.dy}');
   }
 
   Future<String?> loadPreferredLocaleCode() async {
@@ -146,4 +158,3 @@ class AppStorage {
     await file.writeAsString(localeCode == null ? 'system' : localeCode);
   }
 }
-

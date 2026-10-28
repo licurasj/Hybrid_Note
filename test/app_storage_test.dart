@@ -69,4 +69,42 @@ void main() {
     expect(loaded.isDarkMode, isTrue);
     expect(File('${dataFile.path}.tmp').existsSync(), isFalse);
   });
+
+  test('overlapping saves finish in call order and leave the last one', () async {
+    // Callers emit before awaiting the save, so saves can overlap (T-1 F1).
+    final List<Future<void>> saves = [
+      for (int i = 0; i < 20; i++)
+        storage.saveAppData(
+          AppData.empty('device-$i').copyWith(isDarkMode: i.isOdd),
+        ),
+    ];
+    await Future.wait(saves);
+
+    final Map<String, dynamic> saved =
+        jsonDecode(await dataFile.readAsString()) as Map<String, dynamic>;
+    expect(AppData.fromJson(saved).deviceId, 'device-19');
+    expect(File('${dataFile.path}.tmp').existsSync(), isFalse);
+  });
+
+  test('a failed save does not block the saves after it', () async {
+    bool fail = true;
+    final AppStorage flaky = AppStorage(
+      getDirectory: () async {
+        if (fail) {
+          fail = false;
+          throw const FileSystemException('no folder');
+        }
+        return directory;
+      },
+    );
+
+    final Future<void> first = flaky.saveAppData(AppData.empty('device-1'));
+    final Future<void> second = flaky.saveAppData(AppData.empty('device-2'));
+
+    await expectLater(first, throwsA(isA<FileSystemException>()));
+    await second;
+    final Map<String, dynamic> saved =
+        jsonDecode(await dataFile.readAsString()) as Map<String, dynamic>;
+    expect(AppData.fromJson(saved).deviceId, 'device-2');
+  });
 }
