@@ -34,7 +34,11 @@ import '../lists/list_store.dart';
 // gaps are closed by the repair step: every item document carries `_rev`,
 // the schemaRevision of its list when it was written, and an item found
 // with a lower `_rev` has its values fitted to the current fields (what does
-// not fit is hidden in `_legacy`, D-10) and is saved again.
+// not fit is hidden in `_legacy`, D-10) and is saved again. The repair, like
+// the items a large patch saves after its transaction, runs in transactions
+// over the items as stored and the list as stored, so it never writes over a
+// newer edit or brings back a deleted item (T-14 R1). It waits until the
+// lists are in sync with the server, since transactions need it.
 class FirestoreListStore implements ListStore {
   FirestoreListStore(
     this.firestore,
@@ -43,10 +47,9 @@ class FirestoreListStore implements ListStore {
     this.batchLimit = maxBatchWrites,
     this.transactionTimeout = const Duration(seconds: 10),
   }) : _onSkipped = onSkipped ?? _log {
-    _listsSubscription = _lists.snapshots().listen(
-      _onLists,
-      onError: (Object error) => _log(_lists.path, error),
-    );
+    _listsSubscription = _lists
+        .snapshots(includeMetadataChanges: true)
+        .listen(_onLists, onError: (Object error) => _log(_lists.path, error));
   }
 
   final FirebaseFirestore firestore;
@@ -89,6 +92,8 @@ class FirestoreListStore implements ListStore {
   // The ids of every item document under each list, including the ones
   // skipped as malformed, so a list delete removes them all (T-14 R3).
   final Map<String, Set<String>> _docIds = {};
+  // Whether the lists listener last had data from the local cache only.
+  bool _fromCache = true;
   // What each item was last checked as for repair: the list revision and
   // the item's updatedAt, so a later stale write of it is checked again.
   final Map<String, String> _checked = {};
@@ -114,6 +119,13 @@ class FirestoreListStore implements ListStore {
   }
 
   void _onLists(QuerySnapshot<Map<String, dynamic>> snapshot) {
+    _fromCache = snapshot.metadata.isFromCache;
+    if (_listsLoaded && snapshot.docChanges.isEmpty) {
+      // Only the metadata changed, for example back online: repair what
+      // could not be repaired before.
+      _repair();
+      return;
+    }
     _definitions.clear();
     for (final QueryDocumentSnapshot<Map<String, dynamic>> doc
         in snapshot.docs) {
@@ -212,39 +224,120 @@ class FirestoreListStore implements ListStore {
 
   // Fits every item written for an older revision of its list to the
   // current fields and saves the ones that changed. Each version of an item
-  // is checked once per list revision; the save is not awaited, so offline
-  // it queues.
+  // is checked once per list revision, and again if its save failed. The
+  // saves are not awaited.
   void _repair() {
-    final List<void Function(WriteBatch batch)> writes = [];
+    if (_fromCache) {
+      return;
+    }
     for (final MapEntry<String, Map<String, ListItem>> entry
         in _items.entries) {
-      final ListDefinition? definition = _definitions[entry.key];
+      final String listId = entry.key;
+      final ListDefinition? definition = _definitions[listId];
       if (definition == null) {
         continue;
       }
       final int revision = definition.schemaRevision;
+      // The items to save, with the check each was marked with.
+      final Map<String, String> due = {};
       for (final ListItem item in entry.value.values) {
-        final String path = '${entry.key}/${item.id}';
+        final String path = '$listId/${item.id}';
         final String check = '$revision ${item.updatedAt.toIso8601String()}';
-        if ((_revs[entry.key]?[item.id] ?? 0) >= revision ||
+        if ((_revs[listId]?[item.id] ?? 0) >= revision ||
             _checked[path] == check) {
           continue;
         }
         _checked[path] = check;
         try {
-          final ListItem? fitted = _fit(definition, item);
-          if (fitted != null) {
-            writes.add(_setItem(fitted, revision));
+          if (_fit(definition, item) != null) {
+            due[item.id] = check;
           }
         } on Object catch (error) {
           // Reported, and the other items are still repaired (T-14 R5).
-          _skip(_itemsOf(entry.key).doc(item.id).path, error);
+          _skip(_itemsOf(listId).doc(item.id).path, error);
         }
       }
+      if (due.isEmpty) {
+        continue;
+      }
+      _refit(listId, due.keys.toList()).catchError((Object error) {
+        _log('repair $listId', error);
+        // Checked again on the next change or reconnection.
+        for (final MapEntry<String, String> failed in due.entries) {
+          if (_checked['$listId/${failed.key}'] == failed.value) {
+            _checked.remove('$listId/${failed.key}');
+          }
+        }
+      });
     }
-    if (writes.isNotEmpty) {
-      _write(writes).catchError((Object error) => _log('repair', error));
+  }
+
+  // Fits the items as stored to the list as stored and saves the ones that
+  // changed, in transactions of at most [batchLimit] items. An item that
+  // was deleted meanwhile, or written for the current revision, is left
+  // alone; one changed meanwhile makes the transaction run again on the
+  // new data (T-14 R1). [touchedAt] is the updatedAt of an item a patch
+  // changes; a plain repair keeps the item's own.
+  Future<void> _refit(
+    String listId,
+    List<String> itemIds, {
+    DateTime? touchedAt,
+  }) async {
+    for (int start = 0; start < itemIds.length; start += batchLimit) {
+      final List<String> chunk = itemIds.skip(start).take(batchLimit).toList();
+      await firestore.runTransaction((transaction) async {
+        final Map<String, dynamic>? listData = (await transaction.get(
+          _lists.doc(listId),
+        )).data();
+        if (listData == null) {
+          return;
+        }
+        final ListDefinition definition = ListDefinition.fromJson(
+          _decode(listData),
+        );
+        final int revision = definition.schemaRevision;
+        final List<ListItem> fitted = [];
+        for (final String itemId in chunk) {
+          final DocumentReference<Map<String, dynamic>> ref = _itemsOf(
+            listId,
+          ).doc(itemId);
+          final Map<String, dynamic>? data = (await transaction.get(
+            ref,
+          )).data();
+          final Object? rev = data?[_revKey];
+          if (data == null || (rev is int && rev >= revision)) {
+            continue;
+          }
+          try {
+            final ListItem? item = _fit(definition, _itemFrom(data));
+            if (item != null) {
+              fitted.add(item);
+            }
+          } on Object catch (error) {
+            _skip(ref.path, error);
+          }
+        }
+        for (final ListItem item in fitted) {
+          transaction.set(
+            _itemsOf(listId).doc(item.id),
+            _itemData(
+              touchedAt == null ? item : _touched(item, touchedAt),
+              revision,
+            ),
+          );
+        }
+      });
     }
+  }
+
+  static ListItem _touched(ListItem item, DateTime at) {
+    return ListItem(
+      id: item.id,
+      listId: item.listId,
+      values: item.values,
+      createdAt: item.createdAt,
+      updatedAt: at,
+    );
   }
 
   // The item with its values fitted to the definition's fields, or null
@@ -553,8 +646,9 @@ class FirestoreListStore implements ListStore {
 
   // Applies the ops to the list as stored and to every item the cache
   // knows, read again inside the transaction. A patch that changes more
-  // items than fit in one transaction saves the definition in it and the
-  // items in batches after it; the repair step covers an interruption.
+  // items than fit in one transaction saves the definition in it and fits
+  // the items to it afterwards, in transactions over the items as stored
+  // (T-14 R1); the repair step covers an interruption.
   // An attempt that runs once [abandoned] is true, after the patch fell
   // back to a batch, writes nothing: it would read the batch's result and
   // apply the ops a second time.
@@ -564,7 +658,8 @@ class FirestoreListStore implements ListStore {
     bool Function() abandoned,
   ) async {
     final List<String> itemIds = _items[listId]?.keys.toList() ?? const [];
-    List<ListItem> later = const [];
+    final DateTime now = DateTime.now().toUtc();
+    List<String> later = const [];
     final ListPatchResult? result = await firestore.runTransaction((
       transaction,
     ) async {
@@ -594,7 +689,7 @@ class FirestoreListStore implements ListStore {
         definition,
         items,
         opsFor(definition),
-        DateTime.now().toUtc(),
+        now,
       );
       // Checked after the last read, with no await before the writes.
       if (!result.isValid || abandoned()) {
@@ -617,15 +712,12 @@ class FirestoreListStore implements ListStore {
           );
         }
       } else {
-        later = changed;
+        later = [for (final ListItem item in changed) item.id];
       }
       return result;
     });
     if (result != null && later.isNotEmpty && !abandoned()) {
-      await _write([
-        for (final ListItem item in later)
-          _setItem(item, result.definition.schemaRevision),
-      ]);
+      await _refit(listId, later, touchedAt: now);
     }
     return result;
   }

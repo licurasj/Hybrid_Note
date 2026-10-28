@@ -931,51 +931,43 @@ void main() {
     // T-14 R2: moving fields is not idempotent. From [title, kind, size],
     // move title to 1 then kind to 2 gives [title, size, kind] once and
     // [size, title, kind] when applied again on top.
-    test(
-      'a transaction that runs after the fallback does not apply the patch '
-      'again',
-      () async {
-        final _ScriptedFirestore firestore = await _seeded(
-          _ScriptedFirestore(),
-        );
-        final FirestoreListStore store = await _loaded(
-          firestore,
-          transactionTimeout: const Duration(milliseconds: 50),
-        );
-        final ListDefinition list = ListDefinition.fromJson({
-          ..._simple('list-a').toJson(),
-          'fields': [
-            ..._simple('list-a').toJson()['fields'] as List,
-            {'key': 'size', 'type': 'text', 'label': 'Size'},
-          ],
-        });
-        expect(await store.createList(list), isEmpty);
-        await _until(store, (c) => c.definition('list-a') != null);
+    test('a transaction that runs after the fallback does not apply the patch '
+        'again', () async {
+      final _ScriptedFirestore firestore = await _seeded(_ScriptedFirestore());
+      final FirestoreListStore store = await _loaded(
+        firestore,
+        transactionTimeout: const Duration(milliseconds: 50),
+      );
+      final ListDefinition list = ListDefinition.fromJson({
+        ..._simple('list-a').toJson(),
+        'fields': [
+          ..._simple('list-a').toJson()['fields'] as List,
+          {'key': 'size', 'type': 'text', 'label': 'Size'},
+        ],
+      });
+      expect(await store.createList(list), isEmpty);
+      await _until(store, (c) => c.definition('list-a') != null);
 
-        firestore.hold = Completer<void>();
-        final ListPatchResult? result = await store.patchList('list-a', const [
-          ListPatchOp(PatchOpKind.moveField, {'key': 'title', 'index': 1}),
-          ListPatchOp(PatchOpKind.moveField, {'key': 'kind', 'index': 2}),
-        ]);
-        expect(result!.errors, isEmpty);
-        const List<String> once = ['title', 'size', 'kind'];
-        expect(result.definition.fields.map((f) => f.key), once);
-        await _until(
-          store,
-          (c) => c.definition('list-a')!.schemaRevision == 2,
-        );
+      firestore.hold = Completer<void>();
+      final ListPatchResult? result = await store.patchList('list-a', const [
+        ListPatchOp(PatchOpKind.moveField, {'key': 'title', 'index': 1}),
+        ListPatchOp(PatchOpKind.moveField, {'key': 'kind', 'index': 2}),
+      ]);
+      expect(result!.errors, isEmpty);
+      const List<String> once = ['title', 'size', 'kind'];
+      expect(result.definition.fields.map((f) => f.key), once);
+      await _until(store, (c) => c.definition('list-a')!.schemaRevision == 2);
 
-        // The transaction now runs, on the list the fallback saved.
-        firestore.hold!.complete();
-        await firestore.held;
-        await pumpEventQueue();
-        final ListDefinition stored = ListDefinition.fromJson(
-          await _doc(firestore, 'list-a'),
-        );
-        expect(stored.fields.map((f) => f.key), once);
-        expect(stored.schemaRevision, 2);
-      },
-    );
+      // The transaction now runs, on the list the fallback saved.
+      firestore.hold!.complete();
+      await firestore.held;
+      await pumpEventQueue();
+      final ListDefinition stored = ListDefinition.fromJson(
+        await _doc(firestore, 'list-a'),
+      );
+      expect(stored.fields.map((f) => f.key), once);
+      expect(stored.schemaRevision, 2);
+    });
 
     test('other Firestore errors are not taken for offline', () async {
       final _ScriptedFirestore firestore = await _seeded(_ScriptedFirestore());
@@ -1097,11 +1089,53 @@ void main() {
 
     // T-14 R5: the outer shape is fine, so ListItem.fromJson takes it, but
     // the hidden values are not a map.
-    test(
-      'a stale item with malformed hidden values is skipped; the rest is '
-      'repaired',
-      () async {
-        final FakeFirebaseFirestore firestore = await _seeded();
+    test('a stale item with malformed hidden values is skipped; the rest is '
+        'repaired', () async {
+      final FakeFirebaseFirestore firestore = await _seeded();
+      await firestore
+          .doc('users/$_uid/lists/list-a')
+          .set(
+            ListPatch.apply(
+              _simple('list-a'),
+              const [],
+              _toCounter,
+              _t0,
+            ).definition.toJson(),
+          );
+      final String items = 'users/$_uid/lists/list-a/items';
+      await firestore.doc('$items/a-bad').set({
+        ..._kind('a-bad', 'many').toJson(),
+        'values': {'title': 'x', 'kind': 'many', ListPatch.legacyKey: 'bad'},
+        '_rev': 1,
+      });
+      await firestore.doc('$items/b-good').set({
+        ..._kind('b-good', '3').toJson(),
+        '_rev': 1,
+      });
+
+      final List<String> skipped = [];
+      final FirestoreListStore store = await _loaded(
+        firestore,
+        onSkipped: (path, error) => skipped.add(path),
+      );
+      await _until(
+        store,
+        (c) => c.itemsOf('list-a').any((i) => i['kind'] == 3),
+      );
+      expect(skipped, ['$items/a-bad']);
+      expect(store.current.itemsOf('list-a').map((i) => i.id), ['b-good']);
+      expect((await firestore.doc('$items/b-good').get()).data()!['_rev'], 2);
+    });
+
+    // T-14 R1: device B changes a stale item just before device A's repair
+    // writes it, whether A writes in a batch or a transaction.
+    group('two clients: the repair against a concurrent change', () {
+      late _ScriptedFirestore firestore;
+      const String items = 'users/$_uid/lists/list-a/items';
+
+      // A's cache has `one` written for revision 1; the list is at 2.
+      setUp(() async {
+        firestore = await _seeded(_ScriptedFirestore());
         await firestore
             .doc('users/$_uid/lists/list-a')
             .set(
@@ -1112,29 +1146,147 @@ void main() {
                 _t0,
               ).definition.toJson(),
             );
-        final String items = 'users/$_uid/lists/list-a/items';
-        await firestore.doc('$items/a-bad').set({
-          ..._kind('a-bad', 'many').toJson(),
-          'values': {'title': 'x', 'kind': 'many', ListPatch.legacyKey: 'bad'},
+        await firestore.doc('$items/one').set({
+          ..._kind('one', '3').toJson(),
           '_rev': 1,
         });
-        await firestore.doc('$items/b-good').set({
-          ..._kind('b-good', '3').toJson(),
-          '_rev': 1,
-        });
+      });
 
-        final List<String> skipped = [];
-        final FirestoreListStore store = await _loaded(
-          firestore,
-          onSkipped: (path, error) => skipped.add(path),
+      // Runs [change] once, before the first write A makes.
+      Future<void> beforeFirstWrite(Future<void> Function() change) {
+        final Completer<void> done = Completer<void>();
+        Future<void> once() async {
+          firestore.beforeTransaction = null;
+          firestore.beforeBatch = null;
+          await change();
+          done.complete();
+        }
+
+        firestore.beforeTransaction = once;
+        firestore.beforeBatch = once;
+        return done.future;
+      }
+
+      test('an edit is kept and fitted, not overwritten', () async {
+        final Future<void> raced = beforeFirstWrite(
+          () => firestore.doc('$items/one').set({
+            ...ListItem(
+              id: 'one',
+              listId: 'list-a',
+              values: const {'title': 'edited on B', 'kind': '4'},
+              createdAt: _t0,
+              updatedAt: _t0.add(const Duration(hours: 1)),
+            ).toJson(),
+            '_rev': 1,
+          }),
         );
+        final FirestoreListStore a = await _loaded(firestore);
+        await raced;
         await _until(
-          store,
-          (c) => c.itemsOf('list-a').any((i) => i['kind'] == 3),
+          a,
+          (c) =>
+              c.itemsOf('list-a').single['title'] == 'edited on B' &&
+              c.itemsOf('list-a').single['kind'] == 4,
         );
-        expect(skipped, ['$items/a-bad']);
-        expect(store.current.itemsOf('list-a').map((i) => i.id), ['b-good']);
-        expect((await firestore.doc('$items/b-good').get()).data()!['_rev'], 2);
+        final Map<String, dynamic> stored = await _doc(
+          firestore,
+          'list-a/items/one',
+        );
+        expect(stored['values'], {'title': 'edited on B', 'kind': 4});
+        expect(stored['_rev'], 2);
+      });
+
+      test('a repair that fails offline is tried again later', () async {
+        firestore.failWith = FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'unavailable',
+        );
+        final FirestoreListStore a = await _loaded(firestore);
+        await pumpEventQueue();
+        expect(firestore.transactions, greaterThan(0));
+        expect(a.current.itemsOf('list-a').single['kind'], '3');
+
+        firestore.failWith = null;
+        await a.apply(ListChanges(saved: [_kind('two', 5)]));
+        await _until(
+          a,
+          (c) => c.itemsOf('list-a').every((i) => i['kind'] is int),
+        );
+        expect((await _doc(firestore, 'list-a/items/one'))['_rev'], 2);
+      });
+
+      test('a deleted item is not brought back', () async {
+        final Future<void> raced = beforeFirstWrite(
+          () => firestore.doc('$items/one').delete(),
+        );
+        final FirestoreListStore a = await _loaded(firestore);
+        await raced;
+        await pumpEventQueue();
+        await _until(a, (c) => c.itemsOf('list-a').isEmpty);
+        await pumpEventQueue();
+        expect((await firestore.doc('$items/one').get()).exists, isFalse);
+      });
+    });
+
+    // T-14 R1: the items a large patch saves after its transaction.
+    test(
+      'two clients: a large patch does not overwrite an edit or bring back a '
+      'deleted item',
+      () async {
+        final _ScriptedFirestore firestore = await _seeded(
+          _ScriptedFirestore(),
+        );
+        final FirestoreListStore a = await _loaded(firestore, batchLimit: 10);
+        await a.createList(
+          _simple('list-a'),
+          items: [for (int n = 0; n < 25; n++) _kind('i$n', '$n')],
+        );
+        await _until(a, (c) => c.itemsOf('list-a').length == 25);
+
+        // After A's transaction saved the definition, before A saves the
+        // items: B edits i20 (with its old list) and deletes i21.
+        const String items = 'users/$_uid/lists/list-a/items';
+        bool raced = false;
+        Future<void> afterFirst() async {
+          firestore.beforeTransaction = null;
+          firestore.beforeBatch = null;
+          await firestore.doc('$items/i20').set({
+            ...ListItem(
+              id: 'i20',
+              listId: 'list-a',
+              values: const {'title': 'edited on B', 'kind': '99'},
+              createdAt: _t0,
+              updatedAt: _t0.add(const Duration(hours: 1)),
+            ).toJson(),
+            '_rev': 1,
+          });
+          await firestore.doc('$items/i21').delete();
+          raced = true;
+        }
+
+        firestore.beforeTransaction = () async {
+          firestore.beforeTransaction = afterFirst;
+          firestore.beforeBatch = afterFirst;
+        };
+        final ListPatchResult? result = await a.patchList('list-a', _toCounter);
+        expect(result!.changedItemIds, hasLength(25));
+        expect(raced, isTrue);
+        await pumpEventQueue();
+
+        final QuerySnapshot<Map<String, dynamic>> stored = await firestore
+            .collection(items)
+            .get();
+        expect(stored.docs.map((d) => d.id), isNot(contains('i21')));
+        expect(stored.docs, hasLength(24));
+        for (final QueryDocumentSnapshot<Map<String, dynamic>> doc
+            in stored.docs) {
+          expect((doc.data()['values'] as Map)['kind'], isA<int>());
+          expect(doc.data()['_rev'], result.definition.schemaRevision);
+        }
+        expect(stored.docs.firstWhere((d) => d.id == 'i20').data()['values'], {
+          'title': 'edited on B',
+          'kind': 99,
+        });
       },
     );
 
