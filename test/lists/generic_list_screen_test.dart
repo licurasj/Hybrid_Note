@@ -13,6 +13,7 @@ import 'package:hybrid_note/lists/list_item.dart';
 import 'package:hybrid_note/lists/list_labels.dart';
 import 'package:hybrid_note/lists/list_rules.dart';
 import 'package:hybrid_note/lists/list_store.dart';
+import 'package:hybrid_note/lists/local_list_store.dart';
 import 'package:hybrid_note/watch_item.dart';
 
 import '../support/fakes.dart';
@@ -58,6 +59,10 @@ class _Recorder implements ListStore {
 
   @override
   Future<void> refresh() async {}
+
+  // The screen uses only the item writes above.
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 Widget _screen(List<ListItem> items, _Recorder recorder) {
@@ -233,6 +238,7 @@ void main() {
         providers: [
           BlocProvider.value(value: cubit),
           BlocProvider(create: (_) => CustomListsCubit(FakeCustomListsStorage())),
+          LocalListStore.provider(),
         ],
         child: _app(const GenericListHost(listId: BuiltinTemplates.watchReadId)),
       ),

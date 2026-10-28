@@ -9,8 +9,12 @@ import 'list_definition.dart';
 import 'list_item.dart';
 import 'list_patch.dart';
 import 'list_rules.dart';
+import 'list_store.dart';
+
+export 'list_store.dart' show DeletedList;
 
 // Lists the user creates, plus name/icon/colour changes to the built-in ones.
+// Screens reach it only through LocalListStore.
 // Kept in a local file of their own: the Drive sync only knows the four
 // built-in lists and would drop anything else. Until the move to Firestore
 // these lists therefore stay on this device.
@@ -119,14 +123,6 @@ class CustomListsStorage {
     await temp.writeAsString(jsonEncode(data.toJson()), flush: true);
     await temp.rename(file.path);
   }
-}
-
-// A deleted list, kept in memory so the Undo snackbar can bring it back (D-5).
-class DeletedList {
-  const DeletedList({required this.definition, required this.items});
-
-  final ListDefinition definition;
-  final List<ListItem> items;
 }
 
 class CustomListsCubit extends Cubit<CustomListsData> {
