@@ -58,9 +58,8 @@ class FirestoreListStore implements ListStore {
   final int batchLimit;
 
   // How long a patch waits for its transaction before it saves the patch as
-  // a batch instead. A transaction that is still running then may commit
-  // later as well; it re-reads the list and either finds the ops already
-  // applied (and saves the same result) or refuses them as invalid.
+  // a batch instead. A transaction attempt that runs after that writes
+  // nothing, so the patch is not applied twice (T-14 R2).
   final Duration transactionTimeout;
 
   // Firestore error codes that mean the server cannot be reached.
@@ -532,12 +531,17 @@ class FirestoreListStore implements ListStore {
     if (!_definitions.containsKey(listId)) {
       return null;
     }
+    // Set once the patch is saved as a batch instead; shared with the
+    // transaction, which may still run (T-14 R2).
+    bool fellBack = false;
     try {
       return await _patchInTransaction(
         listId,
         opsFor,
+        () => fellBack,
       ).timeout(transactionTimeout);
     } on TimeoutException {
+      fellBack = true;
       return _patchCached(listId, opsFor);
     } on FirebaseException catch (error) {
       if (!_offlineCodes.contains(error.code)) {
@@ -551,9 +555,13 @@ class FirestoreListStore implements ListStore {
   // knows, read again inside the transaction. A patch that changes more
   // items than fit in one transaction saves the definition in it and the
   // items in batches after it; the repair step covers an interruption.
+  // An attempt that runs once [abandoned] is true, after the patch fell
+  // back to a batch, writes nothing: it would read the batch's result and
+  // apply the ops a second time.
   Future<ListPatchResult?> _patchInTransaction(
     String listId,
     List<ListPatchOp> Function(ListDefinition definition) opsFor,
+    bool Function() abandoned,
   ) async {
     final List<String> itemIds = _items[listId]?.keys.toList() ?? const [];
     List<ListItem> later = const [];
@@ -588,7 +596,8 @@ class FirestoreListStore implements ListStore {
         opsFor(definition),
         DateTime.now().toUtc(),
       );
-      if (!result.isValid) {
+      // Checked after the last read, with no await before the writes.
+      if (!result.isValid || abandoned()) {
         return result;
       }
       final int revision = result.definition.schemaRevision;
@@ -612,7 +621,7 @@ class FirestoreListStore implements ListStore {
       }
       return result;
     });
-    if (result != null && later.isNotEmpty) {
+    if (result != null && later.isNotEmpty && !abandoned()) {
       await _write([
         for (final ListItem item in later)
           _setItem(item, result.definition.schemaRevision),

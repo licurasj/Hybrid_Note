@@ -511,19 +511,24 @@ void main() {
       expect(await store.createList(_garden('garden')), isEmpty);
       await _until(store, (c) => c.definition('garden') != null);
 
+      // Moving fields is not idempotent (T-14 R2): applied twice, the order
+      // differs from applying it once.
       final ListPatchResult? result = await store.patchList('garden', [
-        ListPatchOp(PatchOpKind.addField, {
-          'field': {'key': 'notes', 'type': 'longText', 'label': 'Notes'},
-        }),
+        ListPatchOp(PatchOpKind.moveField, {'key': 'title', 'index': 1}),
+        ListPatchOp(PatchOpKind.moveField, {'key': 'kind', 'index': 2}),
       ]);
       expect(result?.isValid, isTrue);
-      // Let the late transaction finish: it re-reads the list, finds the
-      // field already there and writes nothing, or saves the same result.
+      final List<String> once = [
+        for (final FieldDefinition field in result!.definition.fields)
+          field.key,
+      ];
+      // Let the late transaction finish: it writes nothing.
       await Future<void>.delayed(const Duration(seconds: 5));
       final ListDefinition stored = ListDefinition.fromJson(
         (await _server(_db, 'users/$uid/lists/garden'))!,
       );
-      expect(stored.fields.where((f) => f.key == 'notes'), hasLength(1));
+      expect(stored.fields.map((f) => f.key), once);
+      expect(stored.schemaRevision, result.definition.schemaRevision);
       expect(stored.validate(), isEmpty);
     });
 

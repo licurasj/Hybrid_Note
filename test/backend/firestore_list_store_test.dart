@@ -60,6 +60,8 @@ class _ScriptedFirestore extends FakeFirebaseFirestore {
   final List<String> deleted = [];
   Object? failWith;
   bool hang = false;
+  Completer<void>? hold;
+  Future<Object?>? held;
 
   @override
   WriteBatch batch() => _ScriptedBatch(this, super.batch());
@@ -78,6 +80,19 @@ class _ScriptedFirestore extends FakeFirebaseFirestore {
     }
     if (hang) {
       return Completer<T>().future;
+    }
+    // A late transaction: it runs only once [hold] completes.
+    final Completer<void>? gate = hold;
+    if (gate != null) {
+      final Future<T> late = gate.future.then(
+        (_) => super.runTransaction(
+          transactionHandler,
+          timeout: timeout,
+          maxAttempts: maxAttempts,
+        ),
+      );
+      held = late;
+      return late;
     }
     return super.runTransaction(
       transactionHandler,
@@ -910,6 +925,55 @@ void main() {
         );
         expect(result!.errors, isEmpty);
         await _until(store, (c) => c.itemsOf('list-a').single['kind'] == 1);
+      },
+    );
+
+    // T-14 R2: moving fields is not idempotent. From [title, kind, size],
+    // move title to 1 then kind to 2 gives [title, size, kind] once and
+    // [size, title, kind] when applied again on top.
+    test(
+      'a transaction that runs after the fallback does not apply the patch '
+      'again',
+      () async {
+        final _ScriptedFirestore firestore = await _seeded(
+          _ScriptedFirestore(),
+        );
+        final FirestoreListStore store = await _loaded(
+          firestore,
+          transactionTimeout: const Duration(milliseconds: 50),
+        );
+        final ListDefinition list = ListDefinition.fromJson({
+          ..._simple('list-a').toJson(),
+          'fields': [
+            ..._simple('list-a').toJson()['fields'] as List,
+            {'key': 'size', 'type': 'text', 'label': 'Size'},
+          ],
+        });
+        expect(await store.createList(list), isEmpty);
+        await _until(store, (c) => c.definition('list-a') != null);
+
+        firestore.hold = Completer<void>();
+        final ListPatchResult? result = await store.patchList('list-a', const [
+          ListPatchOp(PatchOpKind.moveField, {'key': 'title', 'index': 1}),
+          ListPatchOp(PatchOpKind.moveField, {'key': 'kind', 'index': 2}),
+        ]);
+        expect(result!.errors, isEmpty);
+        const List<String> once = ['title', 'size', 'kind'];
+        expect(result.definition.fields.map((f) => f.key), once);
+        await _until(
+          store,
+          (c) => c.definition('list-a')!.schemaRevision == 2,
+        );
+
+        // The transaction now runs, on the list the fallback saved.
+        firestore.hold!.complete();
+        await firestore.held;
+        await pumpEventQueue();
+        final ListDefinition stored = ListDefinition.fromJson(
+          await _doc(firestore, 'list-a'),
+        );
+        expect(stored.fields.map((f) => f.key), once);
+        expect(stored.schemaRevision, 2);
       },
     );
 
