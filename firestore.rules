@@ -1,0 +1,60 @@
+rules_version = '2';
+
+// Q-8 B: each signed-in user reads and writes only their own users/{uid}
+// tree, with light shape checks. Reading in the app stays tolerant (a
+// malformed document is skipped), so these checks guard against writes that
+// are clearly wrong, not against every invalid list.
+//
+// There are no caps on key or entry counts (T-14 R4): the app accepts any
+// number of fields and keeps hidden values, so a cap would make valid lists
+// unwritable. Firestore's 1 MiB per document is the only size limit.
+//
+// Item documents carry the store's `_rev` (an int) next to the item's JSON.
+// Arrays inside arrays are stored as {"__array": [...]} maps; the rules do
+// not look inside `values`, so that encoding passes as it is.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isId(value) {
+      return value is string && value.size() > 0 && value.size() <= 128;
+    }
+
+    // A list definition (ListDefinition.toJson). Keys written by a newer
+    // build are kept by the app, so other keys are allowed.
+    function isList(listId) {
+      let data = request.resource.data;
+      return data.keys().hasAll(['id', 'icon', 'color', 'fields', 'view', 'updatedAt'])
+        && isId(data.id) && data.id == listId
+        && data.icon is string && data.color is string
+        && data.fields is list
+        && data.view is map
+        && (!('behaviors' in data) || data.behaviors is list)
+        && (!('schemaRevision' in data) || data.schemaRevision is int)
+        && data.updatedAt is string;
+    }
+
+    // An item (ListItem.toJson) plus `_rev`, stored under its own list.
+    function isItem(listId, itemId) {
+      let data = request.resource.data;
+      return data.keys().hasAll(['id', 'listId', 'values', 'createdAt', 'updatedAt'])
+        && isId(data.id) && data.id == itemId
+        && data.listId == listId
+        && data.values is map
+        && data.createdAt is string && data.updatedAt is string
+        && (!('_rev' in data) || data._rev is int);
+    }
+
+    match /users/{uid}/lists/{listId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isList(listId);
+
+      match /items/{itemId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isItem(listId, itemId);
+      }
+    }
+  }
+}

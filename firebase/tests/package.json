@@ -1,0 +1,13 @@
+{
+  "name": "hybrid-note-firestore-rules-tests",
+  "private": true,
+  "description": "Firestore security rules tests (T-14, Q-8 B). Run on the emulator, see the runbook.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.1.0"
+  }
+}
