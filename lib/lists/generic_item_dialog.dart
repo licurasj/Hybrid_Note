@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../l10n/generated/app_localizations.dart';
 import 'list_definition.dart';
+import 'list_error.dart';
 import 'list_item.dart';
 import 'list_labels.dart';
 import 'list_rules.dart';
@@ -222,10 +223,10 @@ class _GenericItemDialogState extends State<GenericItemDialog> {
       ),
     );
 
-    final List<String> errors = result.validateAgainst(widget.definition);
+    final List<ListError> errors = result.validateAgainst(widget.definition);
     if (errors.isNotEmpty) {
       setState(() {
-        _error = errors.first;
+        _error = ListLabels(AppLocalizations.of(context)).error(errors.first, widget.definition);
       });
       return;
     }

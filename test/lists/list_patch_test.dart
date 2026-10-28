@@ -196,8 +196,8 @@ void main() {
     ], _t1);
 
     expect(result.isValid, isFalse);
-    expect(result.errors, contains('removeField: no field "nope"'));
-    expect(result.errors, contains(contains('groupBy "price" must be')));
+    expect(result.errors.map((error) => '$error'), contains('removeField: no field "nope"'));
+    expect(result.errors.map((error) => '$error'), contains(contains('groupBy "price" must be')));
   });
 
   test('ops round-trip through JSON, as the AI will send them', () {

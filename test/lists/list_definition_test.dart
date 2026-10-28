@@ -114,7 +114,7 @@ void main() {
       final ListDefinition plants =
           ListDefinition.fromJson(_plantList()..['formatVersion'] = 2);
 
-      expect(plants.validate(), contains(contains('formatVersion 2')));
+      expect(plants.validate().map((error) => '$error'), contains(contains('formatVersion 2')));
     });
   });
 
@@ -145,7 +145,7 @@ void main() {
     });
 
     List<String> errorsFor(Map<String, dynamic> json) {
-      return ListDefinition.fromJson(json).validate();
+      return ListDefinition.fromJson(json).validate().map((error) => '$error').toList();
     }
 
     test('an enum field without options', () {

@@ -7,6 +7,7 @@ import 'package:hybrid_note/lists/builtin_templates.dart';
 import 'package:hybrid_note/lists/custom_lists.dart';
 import 'package:hybrid_note/lists/list_catalog.dart';
 import 'package:hybrid_note/lists/list_definition.dart';
+import 'package:hybrid_note/lists/list_error.dart';
 import 'package:hybrid_note/lists/list_item.dart';
 import 'package:hybrid_note/lists/list_patch.dart';
 import 'package:hybrid_note/lists/list_rules.dart';
@@ -54,7 +55,7 @@ void listStoreContract(
     });
 
     test('read after create: the list and its items', () async {
-      final List<String> errors = await store.createList(_plants(), items: [_plant('fern', 'fern')]);
+      final List<ListError> errors = await store.createList(_plants(), items: [_plant('fern', 'fern')]);
       expect(errors, isEmpty);
 
       final ListCatalog catalog = await until(
@@ -67,9 +68,14 @@ void listStoreContract(
       expect(store.current.definition(_plantsId), isNotNull);
     });
 
+    // Refusals carry the codes the screens translate (Q-14 A).
+    Future<Set<ListErrorCode>> codesOf(Future<List<ListError>> errors) async {
+      return {for (final ListError error in await errors) error.code};
+    }
+
     test('create refuses an invalid definition, bad or duplicate items and a taken id', () async {
       final ListDefinition noName = ListDefinition.fromJson({..._plantsJson(), 'name': ''});
-      expect(await store.createList(noName), isNotEmpty);
+      expect(await codesOf(store.createList(noName)), contains(ListErrorCode.missingName));
       final ListItem untitled = ListItem(
         id: 'nameless',
         listId: _plantsId,
@@ -77,11 +83,16 @@ void listStoreContract(
         createdAt: _t0,
         updatedAt: _t0,
       );
-      expect(await store.createList(_plants(), items: [untitled]), isNotEmpty);
+      expect(
+        await codesOf(store.createList(_plants(), items: [untitled])),
+        contains(ListErrorCode.fieldRequired),
+      );
       // Two items with one id cannot both be kept (one document per item).
       expect(
-        await store.createList(_plants(), items: [_plant('fern', 'fern'), _plant('fern', 'cactus')]),
-        isNotEmpty,
+        await codesOf(
+          store.createList(_plants(), items: [_plant('fern', 'fern'), _plant('fern', 'cactus')]),
+        ),
+        contains(ListErrorCode.duplicateItemId),
       );
       await pumpEventQueue();
       expect(store.current.definition(_plantsId), isNull);
@@ -89,12 +100,12 @@ void listStoreContract(
 
       expect(await store.createList(_plants()), isEmpty);
       await until((c) => c.definition(_plantsId) != null);
-      expect(await store.createList(_plants()), isNotEmpty);
+      expect(await codesOf(store.createList(_plants())), contains(ListErrorCode.listExists));
       final ListDefinition builtin = ListDefinition.fromJson({
         ..._plantsJson(),
         'id': BuiltinTemplates.tasksId,
       });
-      expect(await store.createList(builtin), isNotEmpty);
+      expect(await codesOf(store.createList(builtin)), contains(ListErrorCode.listExists));
     });
 
     test('item save, edit and delete', () async {
@@ -167,7 +178,7 @@ void listStoreContract(
       ]);
       expect(result, isNotNull);
       expect(result!.isValid, isFalse);
-      expect(result.errors, isNotEmpty);
+      expect(result.errors.map((error) => error.code), contains(ListErrorCode.fieldExists));
       expect(store.current.definition(_plantsId)!.toJson(), _plants().toJson());
 
       expect(await store.patchList('list-missing', const []), isNull);
@@ -407,7 +418,7 @@ class StaggeredListStore implements ListStore {
   Future<void> refresh() => inner.refresh();
 
   @override
-  Future<List<String>> createList(ListDefinition definition, {List<ListItem> items = const []}) =>
+  Future<List<ListError>> createList(ListDefinition definition, {List<ListItem> items = const []}) =>
       inner.createList(definition, items: items);
 
   @override

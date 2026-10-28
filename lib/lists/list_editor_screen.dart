@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'builtin_templates.dart';
 import 'list_definition.dart';
+import 'list_editor_rules.dart';
 import 'list_icons.dart';
 import 'list_item.dart';
 import 'list_labels.dart';
@@ -374,55 +375,6 @@ class _ListEditorScreenState extends State<ListEditorScreen> {
     );
   }
 
-  Widget _rulesSection(ListLabels labels) {
-    final AppLocalizations loc = labels.loc;
-    final bool clears = _draft.behaviors.any(
-      (behavior) => behavior.kind == BehaviorKind.clearCompleted,
-    );
-    final List<BehaviorDefinition> others = _draft.behaviors
-        .where((behavior) => behavior.kind != BehaviorKind.clearCompleted)
-        .toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _heading(loc.rules),
-        SwitchListTile(
-          key: const ValueKey('rule-clearCompleted'),
-          contentPadding: EdgeInsets.zero,
-          title: Text(loc.ruleClearCompleted),
-          value: clears,
-          onChanged: (on) => _push(
-            on
-                ? ListPatchOp(PatchOpKind.addBehavior, {
-                    'behavior': const BehaviorDefinition(
-                      kind: BehaviorKind.clearCompleted,
-                    ).toJson(),
-                  })
-                : ListPatchOp(PatchOpKind.removeBehavior, {
-                    'kind': BehaviorKind.clearCompleted.wire,
-                  }),
-          ),
-        ),
-        // Other rules come from templates or, later, the AI; they can be removed here.
-        Wrap(
-          spacing: 6,
-          children: [
-            for (final BehaviorDefinition behavior in others)
-              InputChip(
-                label: Text(labels.behavior(behavior.kind)),
-                onDeleted: () => _push(
-                  ListPatchOp(PatchOpKind.removeBehavior, {
-                    'kind': behavior.kind.wire,
-                  }),
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
   Widget _optionsEditor(ListLabels labels, FieldDefinition field) {
     void setOptions(List<FieldOption> options) {
       _push(
@@ -711,7 +663,7 @@ class _ListEditorScreenState extends State<ListEditorScreen> {
               ),
             ),
             _layoutSection(labels),
-            _rulesSection(labels),
+            ListEditorRules(definition: draft, labels: labels, onOp: _push),
           ],
           if (_result.hiddenValues > 0)
             Padding(
@@ -726,7 +678,7 @@ class _ListEditorScreenState extends State<ListEditorScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 16),
               child: Text(
-                _result.errors.join('\n'),
+                _result.errors.map((error) => labels.error(error, _result.definition)).join('\n'),
                 key: const ValueKey('editor-errors'),
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),

@@ -1,4 +1,5 @@
 import 'list_definition.dart';
+import 'list_error.dart';
 import 'list_vocabulary.dart';
 
 // One entry in any list. `values` maps field keys to JSON values:
@@ -75,11 +76,14 @@ class ListItem {
   }
 
   // Problems with this item's values for the given list; empty when valid.
-  List<String> validateAgainst(ListDefinition definition) {
-    final List<String> errors = [];
+  List<ListError> validateAgainst(ListDefinition definition) {
+    final List<ListError> errors = [];
 
     if (listId != definition.id) {
-      errors.add('item belongs to list "$listId", not "${definition.id}"');
+      errors.add(ListError(
+        ListErrorCode.wrongList,
+        {'list': listId, 'expected': definition.id},
+      ));
     }
 
     for (final FieldDefinition field in definition.fields) {
@@ -87,103 +91,105 @@ class ListItem {
 
       if (value == null) {
         if (field.required) {
-          errors.add('field "${field.key}" is required');
+          errors.add(ListError(ListErrorCode.fieldRequired, {'field': field.key}));
         }
         continue;
       }
 
-      final String? error = _valueError(field, value);
+      final (ListErrorCode, Map<String, String>)? error = _valueError(field, value);
       if (error != null) {
-        errors.add('field "${field.key}": $error');
+        errors.add(ListError(error.$1, {'field': field.key, ...error.$2}));
       }
     }
 
     return errors;
   }
 
-  static String? _valueError(FieldDefinition field, Object value) {
+  static (ListErrorCode, Map<String, String>)? _valueError(
+    FieldDefinition field,
+    Object value,
+  ) {
+    final (ListErrorCode, Map<String, String>) wrongType =
+        (ListErrorCode.wrongValueType, {'type': field.type.wire});
     switch (field.type) {
       case FieldType.text:
       case FieldType.longText:
       case FieldType.url:
       case FieldType.category:
         if (value is! String) {
-          return 'must be a string';
+          return wrongType;
         }
         if (field.required && value.trim().isEmpty) {
-          return 'must not be empty';
+          return (ListErrorCode.valueEmpty, const {});
         }
         return null;
       case FieldType.checkbox:
       case FieldType.toggle:
-        return value is bool ? null : 'must be true or false';
+        return value is bool ? null : wrongType;
       case FieldType.number:
-        return value is num ? _rangeError(field, value) : 'must be a number';
+        return value is num ? _rangeError(field, value) : wrongType;
       case FieldType.counter:
       case FieldType.rating:
-        return value is int ? _rangeError(field, value) : 'must be a whole number';
+        return value is int ? _rangeError(field, value) : wrongType;
       case FieldType.date:
       case FieldType.dateTime:
         return value is String && DateTime.tryParse(value) != null
             ? null
-            : 'must be an ISO date';
+            : wrongType;
       case FieldType.choice:
-        return field.hasOption(value) ? null : '"$value" is not an option';
+        return field.hasOption(value)
+            ? null
+            : (ListErrorCode.notAnOption, {'value': '$value'});
       case FieldType.tags:
         return value is List && value.every((tag) => tag is String)
             ? null
-            : 'must be a list of strings';
+            : wrongType;
       case FieldType.checklist:
-        return _checklistError(value);
+        return value is List ? _checklistError(value) : wrongType;
       case FieldType.recurrence:
-        return _recurrenceError(value);
+        return value is Map ? _recurrenceError(value) : wrongType;
     }
   }
 
-  static String? _rangeError(FieldDefinition field, num value) {
+  static (ListErrorCode, Map<String, String>)? _rangeError(
+    FieldDefinition field,
+    num value,
+  ) {
     if (field.min != null && value < field.min!) {
-      return 'must be at least ${field.min}';
+      return (ListErrorCode.belowMin, {'min': '${field.min}'});
     }
     if (field.max != null && value > field.max!) {
-      return 'must be at most ${field.max}';
+      return (ListErrorCode.aboveMax, {'max': '${field.max}'});
     }
     return null;
   }
 
-  static String? _checklistError(Object value) {
-    if (value is! List) {
-      return 'must be a list of sub-items';
-    }
-
+  static (ListErrorCode, Map<String, String>)? _checklistError(List value) {
     for (final Object? entry in value) {
       if (entry is! Map ||
           entry['id'] is! String ||
           entry['title'] is! String ||
           entry['done'] is! bool) {
-        return 'each sub-item needs id, title and done';
+        return (ListErrorCode.badSubItem, const {});
       }
     }
 
     return null;
   }
 
-  static String? _recurrenceError(Object value) {
-    if (value is! Map) {
-      return 'must be {frequency, customDays?}';
-    }
-
+  static (ListErrorCode, Map<String, String>)? _recurrenceError(Map value) {
     final RecurrenceFrequency? frequency = enumFromWire(
       RecurrenceFrequency.values,
       value['frequency'],
     );
     if (frequency == null) {
-      return 'unknown frequency "${value['frequency']}"';
+      return (ListErrorCode.unknownFrequency, {'value': '${value['frequency']}'});
     }
 
     final Object? customDays = value['customDays'];
     if (frequency == RecurrenceFrequency.custom &&
         (customDays is! int || customDays <= 0)) {
-      return 'custom frequency needs customDays above 0';
+      return (ListErrorCode.customDaysMissing, const {});
     }
 
     return null;
