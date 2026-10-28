@@ -287,5 +287,11 @@
   "errorDuplicateItemId": "2 つのエントリが同じ ID を持っています。",
   "errorItemIdTaken": "エントリの ID が別のリストですでに使われています。",
   "errorItemInOtherList": "別のリストのエントリが含まれています。",
-  "errorBuiltinOnlyInfo": "組み込みリストで変更できるのは名前・アイコン・色・AI 設定だけです。"
+  "errorBuiltinOnlyInfo": "組み込みリストで変更できるのは名前・アイコン・色・AI 設定だけです。",
+  "addRule": "ルールを追加",
+  "ruleKind": "ルール",
+  "ruleRepeatField": "繰り返しの項目",
+  "ruleMoveField": "項目",
+  "ruleMoveFrom": "移動元",
+  "ruleMoveTo": "移動先"
 }

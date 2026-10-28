@@ -789,4 +789,22 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get errorBuiltinOnlyInfo =>
       'En las listas integradas solo se pueden cambiar el nombre, el icono, el color y el ajuste de IA.';
+
+  @override
+  String get addRule => 'Añadir regla';
+
+  @override
+  String get ruleKind => 'Regla';
+
+  @override
+  String get ruleRepeatField => 'Campo de repetición';
+
+  @override
+  String get ruleMoveField => 'Campo';
+
+  @override
+  String get ruleMoveFrom => 'Mover de';
+
+  @override
+  String get ruleMoveTo => 'Mover a';
 }

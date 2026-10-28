@@ -180,7 +180,7 @@ class ListLabels {
 
   // A validation error in the user's language (Q-14 A). Field keys are shown
   // by their label when `definition` has the field; ids are left out, and
-  // wire names without a label (roles, most rule parameters) stay as they are.
+  // wire names without a label (roles, copyOnClear's parameters) stay as they are.
   String error(ListError error, [ListDefinition? definition]) {
     String fieldName(String key) {
       final FieldDefinition? found = definition?.field(key);
@@ -314,7 +314,7 @@ class ListLabels {
     }
   }
 
-  // View and rule parameters that the editor already has a label for.
+  // View and rule parameters that the editor has a label for.
   String _param(String wire) {
     switch (wire) {
       case 'sectionBy':
@@ -328,7 +328,13 @@ class ListLabels {
       case 'filterChipsBy':
         return loc.filterBy;
       case 'recurrenceField':
-        return loc.repeat;
+        return loc.ruleRepeatField;
+      case 'field':
+        return loc.ruleMoveField;
+      case 'from':
+        return loc.ruleMoveFrom;
+      case 'to':
+        return loc.ruleMoveTo;
     }
     return wire;
   }

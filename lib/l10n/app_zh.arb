@@ -287,5 +287,11 @@
   "errorDuplicateItemId": "两个条目的 ID 相同。",
   "errorItemIdTaken": "某个条目的 ID 已被另一个列表使用。",
   "errorItemInOtherList": "有条目属于另一个列表。",
-  "errorBuiltinOnlyInfo": "内置列表只能修改名称、图标、颜色和 AI 设置。"
+  "errorBuiltinOnlyInfo": "内置列表只能修改名称、图标、颜色和 AI 设置。",
+  "addRule": "添加规则",
+  "ruleKind": "规则",
+  "ruleRepeatField": "重复字段",
+  "ruleMoveField": "字段",
+  "ruleMoveFrom": "移动自",
+  "ruleMoveTo": "移动到"
 }

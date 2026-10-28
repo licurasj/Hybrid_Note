@@ -287,5 +287,11 @@
   "errorDuplicateItemId": "Zwei Einträge haben dieselbe ID.",
   "errorItemIdTaken": "Die ID eines Eintrags wird schon von einer anderen Liste verwendet.",
   "errorItemInOtherList": "Ein Eintrag gehört zu einer anderen Liste.",
-  "errorBuiltinOnlyInfo": "Bei integrierten Listen lassen sich nur Name, Symbol, Farbe und KI-Einstellung ändern."
+  "errorBuiltinOnlyInfo": "Bei integrierten Listen lassen sich nur Name, Symbol, Farbe und KI-Einstellung ändern.",
+  "addRule": "Regel hinzufügen",
+  "ruleKind": "Regel",
+  "ruleRepeatField": "Wiederholungsfeld",
+  "ruleMoveField": "Feld",
+  "ruleMoveFrom": "Verschieben von",
+  "ruleMoveTo": "Verschieben nach"
 }

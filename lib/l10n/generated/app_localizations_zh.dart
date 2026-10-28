@@ -782,4 +782,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get errorBuiltinOnlyInfo => '内置列表只能修改名称、图标、颜色和 AI 设置。';
+
+  @override
+  String get addRule => '添加规则';
+
+  @override
+  String get ruleKind => '规则';
+
+  @override
+  String get ruleRepeatField => '重复字段';
+
+  @override
+  String get ruleMoveField => '字段';
+
+  @override
+  String get ruleMoveFrom => '移动自';
+
+  @override
+  String get ruleMoveTo => '移动到';
 }

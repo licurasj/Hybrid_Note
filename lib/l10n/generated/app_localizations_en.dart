@@ -788,4 +788,22 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get errorBuiltinOnlyInfo =>
       'Built-in lists can only change their name, icon, color and AI setting.';
+
+  @override
+  String get addRule => 'Add rule';
+
+  @override
+  String get ruleKind => 'Rule';
+
+  @override
+  String get ruleRepeatField => 'Repeat field';
+
+  @override
+  String get ruleMoveField => 'Field';
+
+  @override
+  String get ruleMoveFrom => 'Move from';
+
+  @override
+  String get ruleMoveTo => 'Move to';
 }

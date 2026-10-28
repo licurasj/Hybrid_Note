@@ -1453,6 +1453,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Built-in lists can only change their name, icon, color and AI setting.'**
   String get errorBuiltinOnlyInfo;
+
+  /// No description provided for @addRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Add rule'**
+  String get addRule;
+
+  /// No description provided for @ruleKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule'**
+  String get ruleKind;
+
+  /// No description provided for @ruleRepeatField.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat field'**
+  String get ruleRepeatField;
+
+  /// No description provided for @ruleMoveField.
+  ///
+  /// In en, this message translates to:
+  /// **'Field'**
+  String get ruleMoveField;
+
+  /// No description provided for @ruleMoveFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Move from'**
+  String get ruleMoveFrom;
+
+  /// No description provided for @ruleMoveTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to'**
+  String get ruleMoveTo;
 }
 
 class _AppLocalizationsDelegate

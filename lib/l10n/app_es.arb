@@ -287,5 +287,11 @@
   "errorDuplicateItemId": "Dos elementos tienen el mismo ID.",
   "errorItemIdTaken": "El ID de un elemento ya lo usa otra lista.",
   "errorItemInOtherList": "Un elemento pertenece a otra lista.",
-  "errorBuiltinOnlyInfo": "En las listas integradas solo se pueden cambiar el nombre, el icono, el color y el ajuste de IA."
+  "errorBuiltinOnlyInfo": "En las listas integradas solo se pueden cambiar el nombre, el icono, el color y el ajuste de IA.",
+  "addRule": "Añadir regla",
+  "ruleKind": "Regla",
+  "ruleRepeatField": "Campo de repetición",
+  "ruleMoveField": "Campo",
+  "ruleMoveFrom": "Mover de",
+  "ruleMoveTo": "Mover a"
 }

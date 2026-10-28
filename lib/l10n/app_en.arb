@@ -654,5 +654,11 @@
   "errorDuplicateItemId": "Two items have the same ID.",
   "errorItemIdTaken": "An item's ID is already used by another list.",
   "errorItemInOtherList": "An item belongs to another list.",
-  "errorBuiltinOnlyInfo": "Built-in lists can only change their name, icon, color and AI setting."
+  "errorBuiltinOnlyInfo": "Built-in lists can only change their name, icon, color and AI setting.",
+  "addRule": "Add rule",
+  "ruleKind": "Rule",
+  "ruleRepeatField": "Repeat field",
+  "ruleMoveField": "Field",
+  "ruleMoveFrom": "Move from",
+  "ruleMoveTo": "Move to"
 }

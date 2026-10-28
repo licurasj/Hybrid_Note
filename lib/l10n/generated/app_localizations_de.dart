@@ -790,4 +790,22 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get errorBuiltinOnlyInfo =>
       'Bei integrierten Listen lassen sich nur Name, Symbol, Farbe und KI-Einstellung ändern.';
+
+  @override
+  String get addRule => 'Regel hinzufügen';
+
+  @override
+  String get ruleKind => 'Regel';
+
+  @override
+  String get ruleRepeatField => 'Wiederholungsfeld';
+
+  @override
+  String get ruleMoveField => 'Feld';
+
+  @override
+  String get ruleMoveFrom => 'Verschieben von';
+
+  @override
+  String get ruleMoveTo => 'Verschieben nach';
 }

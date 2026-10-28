@@ -287,5 +287,11 @@
   "errorDuplicateItemId": "Deux éléments ont le même identifiant.",
   "errorItemIdTaken": "L'identifiant d'un élément est déjà utilisé par une autre liste.",
   "errorItemInOtherList": "Un élément appartient à une autre liste.",
-  "errorBuiltinOnlyInfo": "Pour les listes intégrées, seuls le nom, l'icône, la couleur et le réglage IA peuvent changer."
+  "errorBuiltinOnlyInfo": "Pour les listes intégrées, seuls le nom, l'icône, la couleur et le réglage IA peuvent changer.",
+  "addRule": "Ajouter une règle",
+  "ruleKind": "Règle",
+  "ruleRepeatField": "Champ de répétition",
+  "ruleMoveField": "Champ",
+  "ruleMoveFrom": "Déplacer de",
+  "ruleMoveTo": "Déplacer vers"
 }

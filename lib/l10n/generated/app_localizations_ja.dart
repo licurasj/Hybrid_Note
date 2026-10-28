@@ -784,4 +784,22 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get errorBuiltinOnlyInfo => '組み込みリストで変更できるのは名前・アイコン・色・AI 設定だけです。';
+
+  @override
+  String get addRule => 'ルールを追加';
+
+  @override
+  String get ruleKind => 'ルール';
+
+  @override
+  String get ruleRepeatField => '繰り返しの項目';
+
+  @override
+  String get ruleMoveField => '項目';
+
+  @override
+  String get ruleMoveFrom => '移動元';
+
+  @override
+  String get ruleMoveTo => '移動先';
 }
