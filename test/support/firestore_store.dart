@@ -40,8 +40,37 @@ Future<FirestoreListStore> fakeFirestoreStore({
     await store.apply(ListChanges(saved: items));
     await store
         .watch()
-        .firstWhere((catalog) => items.every((item) => catalog.itemsOf(item.listId).any((i) => i.id == item.id)))
+        .firstWhere(
+          (catalog) => items.every(
+            (item) => catalog.itemsOf(item.listId).any((i) => i.id == item.id),
+          ),
+        )
         .timeout(const Duration(seconds: 10));
   }
   return store;
+}
+
+// Widget tests: fake_cloud_firestore runs on the real event loop and does
+// not advance with a widget test's fake clock, so FirestoreListStore's load
+// never finishes there. The store is built in tester.runAsync, and [settle]
+// gives its writes and snapshots real time before the widgets settle; use it
+// wherever the test waits for the store.
+Future<FirestoreListStore> widgetTestStore(
+  WidgetTester tester, {
+  List<ListDefinition>? lists,
+  List<ListItem> items = const [],
+}) async {
+  return (await tester.runAsync(
+    () => fakeFirestoreStore(lists: lists, items: items),
+  ))!;
+}
+
+Future<void> settle(WidgetTester tester) async {
+  for (int i = 0; i < 5; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump();
+  }
+  await tester.pumpAndSettle();
 }
