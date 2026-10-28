@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "377269928861-sarilbeke69sf138357abu8mljsmab31.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.yonghao.hybridnote",
+            "certificate_hash": "5b5544b061266cd95ba22f96f1b8639e6db95702"
+          }
+        },
+        {
           "client_id": "377269928861-ba2tljooavsnhj4g2h33re724v051p0l.apps.googleusercontent.com",
           "client_type": 3
         }
