@@ -45,6 +45,7 @@ dependencies:
   http: ^1.2.2
   flutter_localizations:
     sdk: flutter
+  firebase_core: ^5.1.0
 
 dev_dependencies:
   flutter_test:

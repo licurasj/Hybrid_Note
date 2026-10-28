@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -5,6 +6,7 @@ import 'app_cubit.dart';
 import 'app_state.dart';
 import 'app_storage.dart';
 import 'drive_sync_service.dart';
+import 'firebase_options.dart';
 import 'home_screen.dart';
 import 'app_colors.dart';
 import 'l10n/generated/app_localizations.dart';
@@ -21,6 +23,9 @@ import 'lists/list_patch.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   final AppStorage storage = AppStorage();
   final String deviceId = await storage.getOrCreateDeviceId();
